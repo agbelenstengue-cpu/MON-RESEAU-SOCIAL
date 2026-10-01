@@ -1,5 +1,5 @@
 // Section 7.7 (onglet Me), 6 (relations), 15 (profils), 19 (notifications), 20 (paramètres).
-import { t, getLang, setLang, compact, relTime } from '../i18n.js';
+import { t, getLang, setLang, compact, relTime, LANGUAGES } from '../i18n.js';
 import { store, get, post, patch, put, del, readImage, getToken } from '../api.js';
 import { html, mount, $, $$, icon, logo, avatar, toast, showError, dialog, actionSheet, reportFlow, empty, skeleton } from '../ui.js';
 import { layout, go, backButton, wireBack, signOut } from '../app.js';
@@ -433,7 +433,7 @@ export async function settingsScreen(root) {
       html`<div class="section-title">${t('settings.account')}</div>
         <div class="menu-group">
           <label class="list-item">${icon('world')}<span class="grow">${t('settings.language')}</span>
-            <select class="lang-select" data-lang><option value="en" ${getLang() === 'en' ? 'selected' : ''}>English</option><option value="fr" ${getLang() === 'fr' ? 'selected' : ''}>Français</option></select></label>
+            <select class="lang-select" data-lang>${LANGUAGES.map((l) => html`<option value="${l.code}" ${getLang() === l.code ? 'selected' : ''}>${l.name}</option>`)}</select></label>
           <label class="list-item">${icon('eye')}<span class="grow">${t('settings.theme')}</span>
             <select class="lang-select" data-theme>
               <option value="auto" ${theme === 'auto' ? 'selected' : ''}>${t('settings.themeAuto')}</option>
@@ -473,7 +473,7 @@ export async function settingsScreen(root) {
         <p class="center muted small" style="padding:16px">MIC — Interconnected World · v0.1 (prototype)</p>`
     );
     $('[data-lang]', main).addEventListener('change', async (e) => {
-      setLang(e.target.value);
+      await setLang(e.target.value);
       store.me = await patch('/me', { language: e.target.value }).catch(() => store.me);
       settingsScreen(root);
     });

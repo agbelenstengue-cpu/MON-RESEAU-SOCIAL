@@ -7,7 +7,7 @@ const OTP_TTL = 10 * 60 * 1000;
 const OTP_MAX_PER_HOUR = 5;
 const MIN_AGE = 13; // à fixer par pays avec le juridique (section 23)
 const ADULT_AGE = 18;
-const LANGUAGES = ['en', 'fr'];
+const LANGUAGES = ['en', 'fr', 'es', 'pt', 'ar', 'sw']; // langues de lancement (3.2)
 
 export function normalizePhone(raw) {
   const digits = String(raw ?? '').replace(/[\s().-]/g, '');

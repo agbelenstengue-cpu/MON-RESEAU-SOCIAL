@@ -1,5 +1,5 @@
 // Point d'entrée : routeur, coquille (barre supérieure + barre de navigation) et état global.
-import { t } from './i18n.js';
+import { t, ensureLang } from './i18n.js';
 import { store, getToken, setToken, get, on, connect, disconnect } from './api.js';
 import { html, mount, icon, $, $$, toast } from './ui.js';
 import { welcomeScreen, authScreen } from './screens/auth.js';
@@ -178,6 +178,7 @@ export async function refreshBadges() {
 
 // --- Démarrage ---
 async function boot() {
+  await ensureLang();
   if (!navigator.onLine) setTimeout(() => setOffline(true), 0);
   if (getToken()) {
     try {

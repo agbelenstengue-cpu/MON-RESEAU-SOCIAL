@@ -460,7 +460,7 @@ textarea.input {
   border: 0;
   background: none;
   width: 100%;
-  text-align: left;
+  text-align: start;
   color: inherit;
 }
 .list-item:hover {
@@ -822,7 +822,7 @@ body[data-universe='world'] .mine .bubble {
   margin: 2px 0 4px;
 }
 .bubble .quote {
-  border-left: 3px solid var(--cognac);
+  border-inline-start: 3px solid var(--cognac);
   padding: 4px 8px;
   margin-bottom: 4px;
   border-radius: 6px;
@@ -831,7 +831,7 @@ body[data-universe='world'] .mine .bubble {
 }
 .mine .bubble .quote {
   background: rgba(255, 255, 255, 0.12);
-  border-left-color: var(--sage);
+  border-inline-start-color: var(--sage);
 }
 .reactions {
   display: flex;
@@ -911,7 +911,7 @@ body[data-universe='world'] .mine .bubble {
   gap: var(--s2);
   padding: var(--s2) var(--s4);
   background: var(--surface-2);
-  border-left: 3px solid var(--accent);
+  border-inline-start: 3px solid var(--accent);
   font-size: 13px;
 }
 .request-banner {
@@ -1294,7 +1294,7 @@ body[data-universe='world'] .mine .bubble {
   border: 0;
   background: none;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   font-size: 15px;
 }
 .sheet .action svg {
@@ -2462,14 +2462,14 @@ body[data-universe='world'] .mine .bubble {
   padding: var(--s4);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-left: 4px solid var(--line);
+  border-inline-start: 4px solid var(--line);
   border-radius: var(--r-md);
 }
 .mod-card.sev-critical {
-  border-left-color: var(--garnet);
+  border-inline-start-color: var(--garnet);
 }
 .mod-card.sev-high {
-  border-left-color: var(--brass);
+  border-inline-start-color: var(--brass);
 }
 .mod-card .sev {
   font-size: 11px;
@@ -2663,4 +2663,43 @@ body[data-universe='world'] .mine .bubble {
   gap: var(--s2);
   margin-top: var(--s3);
   flex-wrap: wrap;
+}
+
+/* ---------- Écriture de droite à gauche (3.3) ---------- */
+[dir='rtl'] [data-back] svg,
+[dir='rtl'] .composer .send svg,
+[dir='rtl'] .rec-bar .send svg {
+  transform: scaleX(-1);
+}
+[dir='rtl'] .clip-side {
+  right: auto;
+  left: 8px;
+}
+[dir='rtl'] .clip-caption {
+  left: 72px;
+  right: 14px;
+}
+[dir='rtl'] .clip-sound,
+[dir='rtl'] .clip-mute {
+  right: auto;
+  left: 10px;
+}
+[dir='rtl'] .clip-badge {
+  left: auto;
+  right: 10px;
+}
+[dir='rtl'] .rec-lock {
+  right: auto;
+  left: 18px;
+}
+[dir='rtl'] .self-view {
+  right: auto;
+  left: 16px;
+}
+[dir='rtl'] .tile .tile-name {
+  left: auto;
+  right: 12px;
+}
+[dir='rtl'] body {
+  font-family: 'Noto Sans Arabic', 'Noto Naskh Arabic', var(--font-ui);
 }

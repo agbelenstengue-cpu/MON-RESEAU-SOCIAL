@@ -660,34 +660,63 @@ const DICT = {
   'err.confirmation_required': ['Type your @username to confirm.', 'Tapez votre @username pour confirmer.'],
 };
 
-const LOCALES = { en: 'en', fr: 'fr' };
+// Langues de lancement (3.2), chacune écrite dans sa propre langue.
+// L'anglais et le français sont intégrés ; les autres sont téléchargées à la demande (3.3).
+export const LANGUAGES = [
+  { code: 'en', name: 'English' },
+  { code: 'fr', name: 'Français' },
+  { code: 'es', name: 'Español' },
+  { code: 'pt', name: 'Português' },
+  { code: 'ar', name: 'العربية', rtl: true },
+  { code: 'sw', name: 'Kiswahili' },
+];
+const LOADED = {};
 let lang = 'en';
 try {
   lang = localStorage.getItem('mic.lang') || (navigator.language || 'en').slice(0, 2);
 } catch {
   /* stockage indisponible */
 }
-if (!LOCALES[lang]) lang = 'en';
+if (!LANGUAGES.some((l) => l.code === lang)) lang = 'en';
 
 export function getLang() {
   return lang;
 }
 
-export function setLang(next) {
-  if (!LOCALES[next]) return;
+function applyDocument() {
+  document.documentElement.lang = lang;
+  // Interface en miroir pour les langues écrites de droite à gauche (3.3).
+  document.documentElement.dir = LANGUAGES.find((l) => l.code === lang)?.rtl ? 'rtl' : 'ltr';
+}
+
+// Charge le fichier de la langue si nécessaire (une seule fois).
+export async function ensureLang(code = lang) {
+  if (code === 'en' || code === 'fr' || LOADED[code]) return;
+  try {
+    LOADED[code] = (await import(`./locales/${code}.js`)).default;
+  } catch {
+    LOADED[code] = {}; // hors ligne : repli sur l'anglais
+  }
+}
+
+export async function setLang(next) {
+  if (!LANGUAGES.some((l) => l.code === next)) return;
+  await ensureLang(next);
   lang = next;
-  document.documentElement.lang = next;
+  applyDocument();
   try {
     localStorage.setItem('mic.lang', next);
   } catch {
     /* ignore */
   }
 }
-document.documentElement.lang = lang;
+applyDocument();
 
 export function t(key, vars = {}) {
   const entry = DICT[key];
-  let s = entry ? entry[lang === 'fr' ? 1 : 0] : key;
+  let s;
+  if (lang === 'en' || lang === 'fr') s = entry ? entry[lang === 'fr' ? 1 : 0] : key;
+  else s = LOADED[lang]?.[key] ?? (entry ? entry[0] : key);
   for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, v);
   return s;
 }

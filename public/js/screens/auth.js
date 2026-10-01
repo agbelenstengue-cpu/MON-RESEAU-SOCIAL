@@ -1,5 +1,5 @@
 // Section 5 : écran d'accueil et inscription étape par étape.
-import { t, getLang, setLang } from '../i18n.js';
+import { t, getLang, setLang, LANGUAGES } from '../i18n.js';
 import { post, get } from '../api.js';
 import { html, mount, $, $$, logo, icon, errorText, debounce } from '../ui.js';
 import { go, setUniverse, signedIn } from '../app.js';
@@ -24,14 +24,13 @@ const COUNTRIES = [
 
 function langSelect() {
   return html`<select class="lang-select" data-lang aria-label="Language">
-    <option value="en" ${getLang() === 'en' ? 'selected' : ''}>English</option>
-    <option value="fr" ${getLang() === 'fr' ? 'selected' : ''}>Français</option>
+    ${LANGUAGES.map((l) => html`<option value="${l.code}" ${getLang() === l.code ? 'selected' : ''}>${l.name}</option>`)}
   </select>`;
 }
 
 function wireLang(root, rerender) {
-  $('[data-lang]', root)?.addEventListener('change', (e) => {
-    setLang(e.target.value);
+  $('[data-lang]', root)?.addEventListener('change', async (e) => {
+    await setLang(e.target.value);
     rerender();
   });
 }
