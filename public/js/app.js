@@ -6,6 +6,7 @@ import { welcomeScreen, authScreen } from './screens/auth.js';
 import { chatsScreen, chatScreen, newChatScreen, newGroupScreen, callsScreen } from './screens/chats.js';
 import { initCalls, hangUp } from './calls.js';
 import { myReportsScreen, accountStatusScreen, moderationScreen } from './screens/safety.js';
+import { channelScreen, newChannelScreen, broadcastsScreen, broadcastScreen } from './screens/channels.js';
 import './voice.js';
 import { storiesScreen } from './screens/stories.js';
 import { createScreen } from './screens/create.js';
@@ -42,6 +43,11 @@ const ROUTES = [
   ['settings', settingsScreen],
   ['edit-profile', editProfileScreen],
   ['notifications', notificationsScreen],
+  ['channel/:handle', channelScreen],
+  ['channel/:handle/:code', channelScreen],
+  ['new-channel', newChannelScreen],
+  ['broadcasts', broadcastsScreen],
+  ['broadcast/:id', broadcastScreen],
   ['my-reports', myReportsScreen],
   ['account-status', accountStatusScreen],
   ['moderation', moderationScreen],

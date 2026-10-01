@@ -456,11 +456,20 @@ export async function searchScreen(root) {
   const search = debounce(async (q) => {
     if (!q) return showDefault();
     try {
-      const [people, other] = await Promise.all([get(`/users/search?q=${encodeURIComponent(q)}`), get(`/search?q=${encodeURIComponent(q)}`)]);
-      if (!people.length && !other.hashtags.length && !other.posts.length) return mount(results, empty(t('search.noResults')));
+      const [people, other, channels] = await Promise.all([
+        get(`/users/search?q=${encodeURIComponent(q)}`),
+        get(`/search?q=${encodeURIComponent(q)}`),
+        get(`/channels/search?q=${encodeURIComponent(q)}`).catch(() => []),
+      ]);
+      if (!people.length && !other.hashtags.length && !other.posts.length && !channels.length) return mount(results, empty(t('search.noResults')));
       mount(
         results,
         html`${people.length ? html`<div class="section-title">${t('search.people')}</div><ul class="list">${people.map(person)}</ul>` : ''}
+          ${channels.length
+            ? html`<div class="section-title">${t('channel.channels')}</div><ul class="list">${channels.map(
+                (c) => html`<li><a class="list-item" href="#/channel/${c.handle}">${avatar({ name: c.name, avatar: c.avatar }, 'sm')}<span class="grow"><span class="title" style="display:block">${c.name}</span><span class="preview">@${c.handle} · ${t('channel.subscribers', { count: compact(c.subscribers) })}</span></span></a></li>`
+              )}</ul>`
+            : ''}
           ${other.hashtags.length
             ? html`<div class="section-title">${t('search.hashtags')}</div>${other.hashtags.map(
                 (h) => html`<a class="trend" href="#/tag/${encodeURIComponent(h.tag)}" style="color:inherit"><b>#${h.tag}</b><span class="small muted">${t('search.postsCount', { count: compact(h.posts) })}</span></a>`

@@ -3,6 +3,7 @@ import { t, relTime } from '../i18n.js';
 import { store, get, post, del, on } from '../api.js';
 import { html, mount, $, $$, icon, avatar, empty, skeleton, sheet, dialog, showError, reportFlow } from '../ui.js';
 import { layout } from '../app.js';
+import { channelsRail } from './channels.js';
 
 const DURATION = 5000;
 
@@ -40,7 +41,8 @@ export async function storiesScreen(root) {
         ${data.world.length
           ? html`<div class="section-title" style="color:var(--world)">${t('stories.fromWorld')}</div><div class="story-rail">${data.world.map((g) => ring(g))}</div>`
           : ''}
-        ${!mine.length && !data.friends.length && !data.world.length ? empty(t('stories.empty'), '', html`<a class="btn" href="#/create/text">${t('stories.add')}</a>`) : ''}
+        ${channelsRail(data.channels || [])}
+        ${!mine.length && !data.friends.length && !data.world.length && !(data.channels || []).length ? empty(t('stories.empty'), '', html`<a class="btn" href="#/create/text">${t('stories.add')}</a>`) : ''}
         <div class="menu-group" style="margin-top:24px">
           <a class="list-item" href="#/archive">${icon('archive')}<span class="grow">${t('stories.archive')}</span></a>
         </div>`
@@ -56,7 +58,8 @@ export async function storiesScreen(root) {
 
   const load = async () => {
     try {
-      data = await get('/stories');
+      const [stories, channels] = await Promise.all([get('/stories'), get('/channels').catch(() => [])]);
+      data = { ...stories, channels };
       draw();
     } catch (err) {
       showError(err);

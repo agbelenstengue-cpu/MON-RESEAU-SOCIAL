@@ -2512,3 +2512,64 @@ body[data-universe='world'] .mine .bubble {
   flex-wrap: wrap;
   margin-top: var(--s3);
 }
+
+/* ---------- Canaux (11.8) ---------- */
+.ch-head {
+  text-align: center;
+  padding: var(--s5) var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+.ch-head .avatar {
+  margin: 0 auto var(--s3);
+}
+.ch-head h2 {
+  font-family: var(--font-brand);
+  margin: 0;
+  font-weight: 600;
+}
+.ch-posts {
+  padding: var(--s3);
+  display: grid;
+  gap: var(--s3);
+  min-height: 40vh;
+}
+.ch-post {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.ch-post img {
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+}
+.ch-post .text {
+  padding: var(--s3) var(--s3) 0;
+  white-space: pre-wrap;
+}
+.ch-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3);
+  flex-wrap: wrap;
+}
+.ch-reactions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.ch-reactions button {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: var(--r-full);
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.ch-reactions button.on {
+  border-color: var(--world);
+  background: var(--world-soft);
+}

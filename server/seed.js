@@ -3,9 +3,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDatabase, tx } from './db.js';
 import { extractHashtags } from './social.js';
+import { CHANNEL_SCHEMA } from './routes/channels.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const db = openDatabase(process.env.MIC_DB || path.join(ROOT, 'data', 'mic.db'));
+db.exec(CHANNEL_SCHEMA);
 const now = Date.now();
 const H = 3600_000;
 
@@ -71,6 +73,14 @@ tx(db, () => {
   story.run(ids.paul, 'friends', 'text', 'Dimanche en famille à Kribi 🌊', 'emerald', now - 2 * H, now + 22 * H);
   story.run(ids.sophie, 'friends', 'text', 'Examens terminés !!! 🎉', 'cognac', now - 5 * H, now + 19 * H);
   story.run(ids.kofi, 'world', 'text', 'Studio ce soir. Live bientôt sur MIC ✨', 'ebony', now - H, now + 23 * H);
+
+  // Canal de démonstration (11.8).
+  const ch = Number(db.prepare("INSERT INTO channels (owner_id, handle, name, description, visibility, invite_code, created_at) VALUES (?, 'mic.officiel', 'MIC Officiel', 'Les nouveautés de MIC — Monde Interconnecté.', 'public', 'demo', ?)").run(ids.angele, now - 10 * 24 * H).lastInsertRowid);
+  db.prepare('INSERT INTO channel_admins (channel_id, user_id) VALUES (?, ?)').run(ch, ids.angele);
+  for (const u of ['paul', 'kofi', 'lea']) db.prepare('INSERT INTO channel_subs (channel_id, user_id, created_at) VALUES (?, ?, ?)').run(ch, ids[u], now);
+  for (const [body, ago] of [['Bienvenue sur le canal officiel de MIC 👋', 30], ['Nouveau : les messages vocaux et les appels vidéo sont disponibles.', 5]]) {
+    db.prepare('INSERT INTO channel_posts (channel_id, author_id, body, created_at) VALUES (?, ?, ?, ?)').run(ch, ids.angele, body, now - ago * H);
+  }
 
   const conv = db.prepare('INSERT INTO conversations (type, title, created_by, created_at) VALUES (?, ?, ?, ?)');
   const member = db.prepare("INSERT INTO conversation_members (conversation_id, user_id, role, status, joined_at, last_read_id, last_delivered_id) VALUES (?, ?, ?, 'active', ?, ?, ?)");

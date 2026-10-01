@@ -66,6 +66,8 @@ export async function chatsScreen(root, { filter = 'all' } = {}) {
     actionSheet([
       { label: t('chats.newChat'), icon: 'chats', run: () => go('new-chat') },
       { label: t('chats.newGroup'), icon: 'users', run: () => go('new-group') },
+      { label: t('broadcast.new'), icon: 'share', run: () => go('broadcasts') },
+      { label: t('channel.new'), icon: 'world', run: () => go('new-channel') },
     ])
   );
   mount(main, skeleton(6));
@@ -84,6 +86,7 @@ export async function chatsScreen(root, { filter = 'all' } = {}) {
           ${chip('all', t('chats.all'))} ${chip('unread', t('chats.unread'))} ${chip('groups', t('chats.groups'))}
           ${chip('requests', t('chats.requests'), requests.length ? html` · ${requests.length}` : '')}
           <a class="chip" href="#/calls">${t('call.history')}</a>
+          <a class="chip" href="#/broadcasts">${t('broadcast.title')}</a>
         </div>
         ${list.length
           ? html`<ul class="list">
