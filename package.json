@@ -4,12 +4,14 @@
   "description": "MIC — Monde Interconnecté : prototype web du réseau social (Me / World)",
   "private": true,
   "type": "module",
-  "main": "server/index.js",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
     "dev": "node --disable-warning=ExperimentalWarning --watch server/index.js",
     "seed": "node --disable-warning=ExperimentalWarning server/seed.js",
-    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
+    "desktop": "electron .",
+    "desktop:win": "electron-builder --win --x64"
   },
   "engines": {
     "node": ">=22.5"
@@ -17,5 +19,66 @@
   "dependencies": {
     "express": "^4.21.2",
     "ws": "^8.18.0"
+  },
+  "author": "MIC",
+  "productName": "MIC",
+  "build": {
+    "appId": "com.mic.interconnected",
+    "productName": "MIC",
+    "copyright": "MIC — Monde Interconnecté",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**",
+      "server/**",
+      "public/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/img/icon-512.png",
+      "artifactName": "MIC-${version}-${arch}-${target}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "shortcutName": "MIC",
+      "artifactName": "MIC-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "MIC-${version}-portable.${ext}"
+    },
+    "linux": {
+      "target": [
+        "dir"
+      ],
+      "icon": "public/img/icon-512.png"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "public/img/icon-512.png"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
   }
 }

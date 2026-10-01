@@ -47,6 +47,29 @@ npm test         # tests d'intégration de l'API (node:test)
 npm run dev      # redémarrage automatique pendant le développement
 ```
 
+### Application de bureau (Windows .exe)
+
+L'application de bureau (Electron) embarque le serveur MIC et s'ouvre dans sa
+propre fenêtre, sans navigateur ni Node.js à installer. À chaque envoi sur
+GitHub, le workflow « MIC pour Windows » construit le `.exe` et le publie dans
+l'onglet **Releases** du dépôt :
+
+- `MIC-Setup-<version>.exe` : installateur (raccourcis Bureau et menu Démarrer) ;
+- `MIC-<version>-portable.exe` : se lance directement, sans installation.
+
+Au premier lancement, les comptes de démonstration ci-dessus sont créés. Les
+données (base, photos, vocaux) restent sur l'ordinateur, dans
+`%APPDATA%\MIC\data`. Le serveur n'écoute que sur cet ordinateur (127.0.0.1) :
+pour discuter entre plusieurs comptes, connectez-vous dans la fenêtre puis
+déconnectez-vous, ou utilisez la version web. L'application n'est pas signée :
+Windows SmartScreen demande une confirmation (« Informations complémentaires »
+→ « Exécuter quand même »).
+
+```bash
+npm run desktop       # lancer l'application de bureau depuis les sources
+npm run desktop:win   # construire le .exe (sous Windows)
+```
+
 Variables d'environnement : `PORT` (3000), `HOST`, `MIC_DB` (chemin de la base,
 par défaut `data/mic.db`), `NODE_ENV=production` (masque les codes OTP),
 `MIC_ICE_SERVERS` (serveurs STUN/TURN pour les appels, en JSON, par exemple
