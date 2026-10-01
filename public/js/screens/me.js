@@ -340,6 +340,8 @@ export async function notificationsScreen(root) {
     if (n.type === 'friend_request' || n.type === 'follow_request') return '#/requests';
     if (n.type === 'moderation_strike' || n.type.startsWith('appeal_')) return '#/account-status';
     if (n.type === 'report_update') return '#/my-reports';
+    if (n.type.startsWith('community_')) return n.type === 'community_request' ? `#/community/${n.refId}/members` : `#/community/${n.refId}`;
+    if (n.type.startsWith('event_')) return `#/event/${n.refId}`;
     return n.actor ? `#/u/${n.actor.username}` : '#/me';
   };
   mount(

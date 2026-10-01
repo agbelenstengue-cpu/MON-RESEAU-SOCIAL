@@ -2573,3 +2573,94 @@ body[data-universe='world'] .mine .bubble {
   border-color: var(--world);
   background: var(--world-soft);
 }
+
+/* ---------- Communautés et événements (18) ---------- */
+.rules {
+  margin: var(--s3) var(--s4);
+  padding: var(--s3) var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.rules summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.card-composer {
+  margin: var(--s3) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.mod-tools {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+  margin-bottom: var(--s2);
+  flex-wrap: wrap;
+}
+.event-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s2);
+  padding: 0 var(--s4);
+}
+.event-card {
+  display: flex;
+  gap: var(--s3);
+  align-items: center;
+  padding: var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: inherit;
+}
+.event-card .title {
+  font-weight: 600;
+}
+.event-card .preview {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.event-card.cancelled {
+  opacity: 0.6;
+}
+.event-date {
+  width: 52px;
+  height: 56px;
+  border-radius: var(--r-md);
+  background: var(--world-soft);
+  color: var(--world);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.event-date b {
+  font-size: 20px;
+  font-family: var(--font-brand);
+}
+.event-date small {
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.event-cover {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+}
+.event-title {
+  font-family: var(--font-brand);
+  font-weight: 600;
+  margin: 0 0 var(--s3);
+}
+.rsvp {
+  display: flex;
+  gap: var(--s2);
+  margin-top: var(--s3);
+  flex-wrap: wrap;
+}

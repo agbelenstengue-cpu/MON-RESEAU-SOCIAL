@@ -319,6 +319,8 @@ export async function worldScreen(root, { feed } = {}) {
         <a class="chip ${feed === 'for-you' ? 'active' : ''}" href="#/world/for-you">${t('world.forYou')}</a>
         <a class="chip ${feed === 'following' ? 'active' : ''}" href="#/world/following">${t('world.following')}</a>
         <a class="chip" href="#/clips">${icon('video', 'width="14" height="14" style="vertical-align:-2px"')} ${t('clip.feed')}</a>
+        <a class="chip" href="#/communities">${icon('users', 'width="14" height="14" style="vertical-align:-2px"')} ${t('community.title')}</a>
+        <a class="chip" href="#/events">${icon('star', 'width="14" height="14" style="vertical-align:-2px"')} ${t('event.title')}</a>
       </div>
       ${!store.me.world.enabled
         ? html`<div class="world-cta"><h3>${t('me.activateWorld')}</h3><p class="small muted">${t('me.activateWorldLead')}</p><button class="btn world" data-join>${t('me.activateWorld')}</button></div>`

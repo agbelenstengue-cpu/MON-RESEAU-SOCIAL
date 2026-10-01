@@ -82,6 +82,16 @@ tx(db, () => {
     db.prepare('INSERT INTO channel_posts (channel_id, author_id, body, created_at) VALUES (?, ?, ?, ?)').run(ch, ids.angele, body, now - ago * H);
   }
 
+  // Communauté et événement de démonstration (18).
+  const cm = Number(db.prepare("INSERT INTO communities (owner_id, handle, name, description, category, type, rules, created_at) VALUES (?, 'cuisine.cm', 'Cuisine camerounaise', 'Recettes, astuces et bonnes adresses.', 'food', 'public', ?, ?)").run(ids.paul, JSON.stringify(['Restez respectueux', 'Partagez vos sources', 'Pas de publicité']), now - 20 * 24 * H).lastInsertRowid);
+  for (const [u, role] of [['paul', 'owner'], ['angele', 'member'], ['kofi', 'moderator']]) {
+    db.prepare("INSERT INTO community_members (community_id, user_id, role, status, created_at) VALUES (?, ?, ?, 'active', ?)").run(cm, ids[u], role, now);
+  }
+  const cp = Number(db.prepare("INSERT INTO posts (author_id, body, audience, created_at, community_id) VALUES (?, ?, 'everyone', ?, ?)").run(ids.paul, 'Quel est votre secret pour un bon poulet DG ? #cuisine', now - 8 * H, cm).lastInsertRowid);
+  db.prepare('INSERT INTO post_hashtags (post_id, tag) VALUES (?, ?)').run(cp, 'cuisine');
+  db.prepare(`INSERT INTO events (host_id, community_id, title, description, starts_at, ends_at, timezone, location, visibility, created_at)
+    VALUES (?, ?, 'Atelier ndolé', 'On cuisine ensemble, chacun repart avec sa portion.', ?, ?, 'Africa/Douala', 'Marché de Mboppi, Douala', 'public', ?)`).run(ids.paul, cm, now + 5 * 24 * H, now + 5 * 24 * H + 3 * H, now);
+
   const conv = db.prepare('INSERT INTO conversations (type, title, created_by, created_at) VALUES (?, ?, ?, ?)');
   const member = db.prepare("INSERT INTO conversation_members (conversation_id, user_id, role, status, joined_at, last_read_id, last_delivered_id) VALUES (?, ?, ?, 'active', ?, ?, ?)");
   const msg = db.prepare('INSERT INTO messages (conversation_id, sender_id, kind, body, created_at) VALUES (?, ?, ?, ?, ?)');

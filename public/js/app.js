@@ -7,6 +7,7 @@ import { chatsScreen, chatScreen, newChatScreen, newGroupScreen, callsScreen } f
 import { initCalls, hangUp } from './calls.js';
 import { myReportsScreen, accountStatusScreen, moderationScreen } from './screens/safety.js';
 import { channelScreen, newChannelScreen, broadcastsScreen, broadcastScreen } from './screens/channels.js';
+import { communitiesScreen, newCommunityScreen, communityScreen, eventsScreen, eventScreen, newEventScreen } from './screens/communities.js';
 import './voice.js';
 import { storiesScreen } from './screens/stories.js';
 import { createScreen } from './screens/create.js';
@@ -43,6 +44,14 @@ const ROUTES = [
   ['settings', settingsScreen],
   ['edit-profile', editProfileScreen],
   ['notifications', notificationsScreen],
+  ['communities', communitiesScreen],
+  ['new-community', newCommunityScreen],
+  ['community/:handle', communityScreen],
+  ['community/:handle/:tab', communityScreen],
+  ['events', eventsScreen],
+  ['event/:id', eventScreen],
+  ['new-event', newEventScreen],
+  ['new-event/:communityId', newEventScreen],
   ['channel/:handle', channelScreen],
   ['channel/:handle/:code', channelScreen],
   ['new-channel', newChannelScreen],
