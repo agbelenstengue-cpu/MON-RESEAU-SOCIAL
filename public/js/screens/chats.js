@@ -5,6 +5,7 @@ import { html, raw, mount, $, $$, icon, avatar, richText, toast, showError, dial
 import { layout, go, backButton, wireBack, refreshBadges } from '../app.js';
 import { VoiceRecorder, blobToDataUrl, fmtDuration, waveformHtml, player } from '../voice.js';
 import { startCall, joinCall, inCall } from '../calls.js';
+import { enqueue, pending, flush } from '../outbox.js';
 
 const QUICK = ['❤️', '😂', '😮', '😢', '🙏', '👍'];
 const EDIT_WINDOW = 15 * 60 * 1000;
@@ -352,6 +353,11 @@ export async function chatScreen(root, { id }) {
       }
       items.push(bubble(m));
     }
+    // Messages en attente d'envoi (hors ligne), avec une horloge.
+    for (const p of pending(convId)) {
+      items.push(html`<div class="bubble-row mine pending"><div class="bubble"><div class="text">${richText(p.body)}</div>
+        <div class="meta"><span>${clock(p.createdAt)}</span>${icon('timer', 'width="14" height="14" aria-label="pending"')}</div></div></div>`);
+    }
     mount(list, html`${items}`);
     if (keepBottom === 'top') list.scrollTop = list.scrollHeight - prevHeight + prevTop;
     else if (keepBottom === 'force' || nearBottom) list.scrollTop = list.scrollHeight;
@@ -455,8 +461,14 @@ export async function chatScreen(root, { id }) {
           await patch(`/messages/${editing.id}`, { body });
           editing = null;
         } else {
-          const m = await post(`/conversations/${convId}/messages`, { body, replyTo: replyTo?.id });
-          upsert(m);
+          try {
+            const m = await post(`/conversations/${convId}/messages`, { body, replyTo: replyTo?.id });
+            upsert(m);
+          } catch (err) {
+            if (err.code !== 'network') throw err;
+            // Hors ligne : le message attend dans la file d'envoi (26.4).
+            enqueue(convId, body, replyTo?.id);
+          }
           replyTo = null;
         }
         if (conv.status !== 'active') conv.status = 'active';
@@ -854,6 +866,7 @@ export async function chatScreen(root, { id }) {
   }
   drawList('force');
   markRead();
+  flush();
 
   // Temps réel.
   const offs = [
@@ -892,6 +905,7 @@ export async function chatScreen(root, { id }) {
       }
     }),
     on('voice:progress', (st) => updateVoice(st)),
+    on('outbox', () => drawList()),
     on('message:expired', (d) => {
       if (d.conversationId !== convId) return;
       messages = messages.filter((x) => x.id !== d.id);

@@ -5,6 +5,8 @@ import { html, mount, icon, $, $$, toast } from './ui.js';
 import { welcomeScreen, authScreen } from './screens/auth.js';
 import { chatsScreen, chatScreen, newChatScreen, newGroupScreen, callsScreen } from './screens/chats.js';
 import { initCalls, hangUp } from './calls.js';
+import { flush as flushOutbox, clearOutbox } from './outbox.js';
+import { applyDataSaver } from './datasaver.js';
 import { myReportsScreen, accountStatusScreen, moderationScreen } from './screens/safety.js';
 import { channelScreen, newChannelScreen, broadcastsScreen, broadcastScreen } from './screens/channels.js';
 import { communitiesScreen, newCommunityScreen, communityScreen, eventsScreen, eventScreen, newEventScreen } from './screens/communities.js';
@@ -176,6 +178,7 @@ export async function refreshBadges() {
 
 // --- Démarrage ---
 async function boot() {
+  if (!navigator.onLine) setTimeout(() => setOffline(true), 0);
   if (getToken()) {
     try {
       store.me = await get('/me');
@@ -197,6 +200,8 @@ export async function signedIn(token, me) {
 
 export function signOut() {
   hangUp();
+  clearOutbox();
+  navigator.serviceWorker?.controller?.postMessage('clear-user-data');
   disconnect();
   setToken(null);
   store.me = null;
@@ -241,4 +246,9 @@ try {
   /* ignore */
 }
 
-boot();
+// Application installable et hors ligne (26.4).
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+applyDataSaver();
+boot().then(() => store.me && flushOutbox());

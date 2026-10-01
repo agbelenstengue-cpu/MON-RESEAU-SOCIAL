@@ -17,6 +17,7 @@ import callRoutes from './routes/calls.js';
 import moderationRoutes from './routes/moderation.js';
 import channelRoutes from './routes/channels.js';
 import communityRoutes from './routes/communities.js';
+import exportRoutes from './routes/export.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -123,6 +124,7 @@ export function createServer({
   moderationRoutes(api, ctx);
   channelRoutes(api, ctx);
   communityRoutes(api, ctx);
+  exportRoutes(api, ctx);
   storyRoutes(api, ctx);
   worldRoutes(api, ctx);
   api.use((req, res, next) => next(new HttpError(404, 'not_found')));

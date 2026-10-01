@@ -141,6 +141,9 @@ export async function uploadVideo(blob) {
 // Lecture d'un fichier image en data URL, redimensionnée pour économiser
 // les données (26.3).
 export function readImage(file, max = 1600) {
+  // Mode économie de données : images plus petites et plus compressées (26.3).
+  const saver = document.documentElement.dataset.datasaver === 'on';
+  if (saver) max = Math.min(max, 1024);
   return new Promise((resolve, reject) => {
     if (!file || !file.type.startsWith('image/')) return reject(new ApiError('invalid_media'));
     const img = new Image();
@@ -152,7 +155,7 @@ export function readImage(file, max = 1600) {
       c.height = Math.round(img.height * scale);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
-      resolve(c.toDataURL('image/jpeg', 0.86));
+      resolve(c.toDataURL('image/jpeg', saver ? 0.7 : 0.86));
     };
     img.onerror = () => reject(new ApiError('invalid_media'));
     img.src = url;

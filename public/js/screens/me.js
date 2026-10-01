@@ -1,11 +1,12 @@
 // Section 7.7 (onglet Me), 6 (relations), 15 (profils), 19 (notifications), 20 (paramètres).
 import { t, getLang, setLang, compact, relTime } from '../i18n.js';
-import { store, get, post, patch, put, del, readImage } from '../api.js';
+import { store, get, post, patch, put, del, readImage, getToken } from '../api.js';
 import { html, mount, $, $$, icon, logo, avatar, toast, showError, dialog, actionSheet, reportFlow, empty, skeleton } from '../ui.js';
 import { layout, go, backButton, wireBack, signOut } from '../app.js';
 import { renderPosts } from './world.js';
 import { openViewer } from './stories.js';
 import { ensureWorld } from './create.js';
+import { dataSaver, setDataSaver, networkUsage, fmtBytes } from '../datasaver.js';
 
 const meCard = () => ({ id: store.me.id, name: store.me.displayName, avatar: store.me.avatar, username: store.me.username });
 
@@ -449,6 +450,16 @@ export async function settingsScreen(root) {
                 <button class="list-item" data-leave-world>${icon('world')}<span class="grow">${t('settings.leaveWorld')}</span></button>`
             : html`<button class="list-item" data-join>${icon('world')}<span class="grow">${t('me.activateWorld')}</span></button>`}
         </div>
+        <div class="section-title">${t('data.title')}</div>
+        <div class="menu-group">
+          <label class="list-item">${icon('archive')}<span class="grow">${t('data.saver')}<span class="preview" style="display:block;white-space:normal">${t('data.saverHint')}</span></span><input type="checkbox" class="toggle" data-saver ${dataSaver() ? 'checked' : ''} /></label>
+          <div class="list-item" style="cursor:default">${icon('eye')}<span class="grow">${t('data.usage')}<span class="preview" style="display:block;white-space:normal">${(() => {
+            const u = networkUsage();
+            return t('data.usageDetail', { api: fmtBytes(u.api), media: fmtBytes(u.media), app: fmtBytes(u.app) });
+          })()}</span></span></div>
+          <button class="list-item" data-export="json">${icon('archive')}<span class="grow">${t('data.export')}<span class="preview" style="display:block;white-space:normal">${t('data.exportHint')}</span></span></button>
+          <button class="list-item" data-export="html">${icon('eye')}<span class="grow">${t('data.exportHtml')}</span></button>
+        </div>
         <div class="section-title">${t('settings.blocked')}</div>
         <div class="menu-group">
           ${blocked.length
@@ -489,6 +500,28 @@ export async function settingsScreen(root) {
         } catch (err) {
           showError(err);
           draw();
+        }
+      })
+    );
+    $('[data-saver]', main).addEventListener('change', (e) => {
+      setDataSaver(e.target.checked);
+      toast(t('common.done'));
+    });
+    // 24.2 : « Download my data ».
+    $$('[data-export]', main).forEach((b) =>
+      b.addEventListener('click', async () => {
+        try {
+          const fmt = b.dataset.export;
+          const res = await fetch(`/api/me/export${fmt === 'html' ? '?format=html' : ''}`, { headers: { authorization: `Bearer ${getToken()}` } });
+          if (!res.ok) throw new Error('export');
+          const url = URL.createObjectURL(await res.blob());
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `mic-${store.me.username}.${fmt}`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        } catch {
+          toast(t('err.generic'));
         }
       })
     );

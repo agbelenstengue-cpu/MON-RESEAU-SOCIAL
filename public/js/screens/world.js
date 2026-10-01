@@ -18,6 +18,11 @@ function fmtDur(ms) {
 const viewed = new Set();
 let clipObserver = null;
 export function watchClips(container) {
+  // Mode économie de données : pas de lecture automatique (26.3).
+  if (document.documentElement.dataset.datasaver === 'on') {
+    $$('video[data-clip-video]', container).forEach((v) => (v.preload = 'none'));
+    return;
+  }
   clipObserver ??= new IntersectionObserver(
     (entries) => {
       for (const e of entries) {
