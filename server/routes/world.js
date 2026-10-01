@@ -1,6 +1,11 @@
 // Sections 14 (World), 16 (interactions) et 17 (recherche, hashtags, recommandation).
 import { now, extractHashtags, extractMentions } from '../social.js';
 import { tx } from '../db.js';
+import express from 'express';
+import { isMinor } from '../privacy.js';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const AUDIENCES = ['everyone', 'followers', 'friends', 'only_me'];
 const COMMENTERS = ['everyone', 'followers', 'friends', 'nobody'];
@@ -8,9 +13,19 @@ const MAX_POST = 5000; // 14.3
 const MAX_COMMENT = 500; // 16.2
 const EDIT_COMMENT_WINDOW = 15 * 60 * 1000;
 const DAY = 24 * 3600 * 1000;
+const MAX_VIDEO = 50 * 1024 * 1024;
+const CLIP_MIN = 1000; // 14.2 : 3 s recommandées, tolérance pour les enregistrements courts
+const CLIP_MAX = 10 * 60 * 1000;
+
+// Reconnaît le conteneur à partir des premiers octets (on ne se fie pas au type annoncé).
+function videoExtension(buf) {
+  if (buf.length > 12 && buf.toString('latin1', 4, 8) === 'ftyp') return buf.toString('latin1', 8, 10) === 'qt' ? 'mov' : 'mp4';
+  if (buf.length > 4 && buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return 'webm';
+  return null;
+}
 
 export default function worldRoutes(api, ctx) {
-  const { db, social, views, notify, saveMedia, HttpError } = ctx;
+  const { db, social, views, notify, saveMedia, HttpError, uploadsDir } = ctx;
   const q = {
     post: db.prepare('SELECT * FROM posts WHERE id = ?'),
     user: db.prepare('SELECT * FROM users WHERE id = ?'),
@@ -55,6 +70,11 @@ export default function worldRoutes(api, ctx) {
     postSearch: db.prepare(`SELECT * FROM posts WHERE deleted_at IS NULL AND body LIKE ? ESCAPE '\\'
       ORDER BY created_at DESC LIMIT 100`),
     softDelete: db.prepare('UPDATE posts SET deleted_at = ? WHERE id = ?'),
+    addUpload: db.prepare('INSERT INTO video_uploads (url, user_id, created_at) VALUES (?, ?, ?)'),
+    upload: db.prepare('SELECT * FROM video_uploads WHERE url = ? AND user_id = ? AND used = 0'),
+    useUpload: db.prepare('UPDATE video_uploads SET used = 1 WHERE url = ?'),
+    setClip: db.prepare('UPDATE posts SET video = ?, duration = ?, allow_download = ? WHERE id = ?'),
+    view: db.prepare('INSERT OR IGNORE INTO post_views (post_id, user_id, viewed_at) VALUES (?, ?, ?)'),
   };
 
   const visiblePost = (id, viewerId) => {
@@ -84,17 +104,45 @@ export default function worldRoutes(api, ctx) {
     }
   };
 
-  // --- Publication (14.3, 14.4) ---
+  // --- Vidéo d'un clip : envoi binaire direct (trop lourd pour du JSON) ---
+  api.post('/media/video', express.raw({ type: 'video/*', limit: MAX_VIDEO }), (req, res) => {
+    requireWorld(req.user);
+    const buf = req.body;
+    if (!Buffer.isBuffer(buf) || !buf.length) throw new HttpError(400, 'invalid_media');
+    const ext = videoExtension(buf);
+    if (!ext) throw new HttpError(400, 'invalid_media');
+    const url = `/uploads/${crypto.randomBytes(16).toString('hex')}.${ext}`;
+    fs.writeFileSync(path.join(uploadsDir, path.basename(url)), buf);
+    q.addUpload.run(url, req.user.id, now());
+    res.status(201).json({ url });
+  });
+
+  // --- Publication (14.3, 14.4) ; clip si une vidéo est jointe (14.2) ---
   api.post('/posts', (req, res) => {
     requireWorld(req.user);
     const b = req.body ?? {};
     const body = String(b.body ?? '').slice(0, MAX_POST);
+    let video = null;
+    let duration = null;
+    if (b.video) {
+      if (!q.upload.get(String(b.video), req.user.id)) throw new HttpError(400, 'invalid_media');
+      video = String(b.video);
+      duration = Math.round(Number(b.duration));
+      if (!Number.isFinite(duration) || duration < CLIP_MIN || duration > CLIP_MAX) throw new HttpError(400, 'invalid_duration');
+    }
+    // Pour un clip, l'image est la couverture (première image choisie par l'appareil).
     const media = saveMedia(b.media);
-    if (!body.trim() && !media) throw new HttpError(400, 'empty_post');
+    if (!body.trim() && !media && !video) throw new HttpError(400, 'empty_post');
     const audience = AUDIENCES.includes(b.audience) ? b.audience : 'everyone';
     const whoCanComment = COMMENTERS.includes(b.whoCanComment) ? b.whoCanComment : 'everyone';
     const id = tx(db, () => {
       const pid = Number(q.insert.run(req.user.id, body, media, audience, whoCanComment, b.hideLikes ? 1 : 0, now()).lastInsertRowid);
+      if (video) {
+        // « Allow download » : désactivé par défaut pour les mineurs (14.4).
+        const allow = b.allowDownload === undefined ? !isMinor(req.user) : !!b.allowDownload;
+        q.setClip.run(video, duration, allow ? 1 : 0, pid);
+        q.useUpload.run(video);
+      }
       indexTags(pid, body);
       return pid;
     });
@@ -143,13 +191,14 @@ export default function worldRoutes(api, ctx) {
 
   // Recommandation simple et explicable : engagement pondéré, fraîcheur,
   // affinité avec les comptes suivis et les hashtags aimés.
-  const rank = (viewerId) => {
+  const rank = (viewerId, { clipsOnly = false } = {}) => {
     const hidden = new Set(q.hidden.all(viewerId).map((r) => r.post_id));
     const tagAffinity = new Map(q.likedTags.all(viewerId).map((r) => [r.tag, r.n]));
     const t = now();
     const out = [];
     for (const p of q.recent.all(t - 30 * DAY)) {
       if (p.author_id === viewerId || hidden.has(p.id)) continue;
+      if (clipsOnly && !p.video) continue;
       if (!social.canViewPost(viewerId, p)) continue;
       const s = q.stats.get(p.id, p.id, p.id, p.id);
       const engagement = 1 + s.likes + 2 * s.comments + 3 * s.shares + 2 * s.saves;
@@ -181,6 +230,20 @@ export default function worldRoutes(api, ctx) {
     const offset = Math.max(Number(req.query.offset) || 0, 0);
     const ranked = rank(req.user.id).slice(offset, offset + 30);
     res.json(ranked.map((r) => views.post(r.p, req.user.id)));
+  });
+
+  // Fil Clips : vidéos courtes recommandées, plein écran vertical (14.2).
+  api.get('/feed/clips', (req, res) => {
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    const ranked = rank(req.user.id, { clipsOnly: true }).slice(offset, offset + 20);
+    res.json(ranked.map((r) => views.post(r.p, req.user.id)));
+  });
+
+  // Vue d'un clip : compteur public (une vue par personne).
+  api.post('/posts/:id/view', (req, res) => {
+    const p = visiblePost(req.params.id, req.user.id);
+    if (p.video && p.author_id !== req.user.id) q.view.run(p.id, req.user.id, now());
+    res.json({ ok: true });
   });
 
   // « Why am I seeing this? » (1.4 Transparence, 17.5).

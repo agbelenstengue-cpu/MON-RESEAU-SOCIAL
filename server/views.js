@@ -17,6 +17,7 @@ export function makeViews(db, social, hub) {
     plays: db.prepare('SELECT user_id FROM voice_plays WHERE message_id = ?'),
     opens: db.prepare('SELECT user_id FROM message_opens WHERE message_id = ?'),
     post: db.prepare('SELECT * FROM posts WHERE id = ?'),
+    viewCount: db.prepare('SELECT COUNT(*) AS n FROM post_views WHERE post_id = ?'),
   };
 
   const views = {
@@ -75,6 +76,11 @@ export function makeViews(db, social, hub) {
         author: views.userCard(author, viewerId),
         body: p.body,
         media: p.media,
+        kind: p.video ? 'clip' : 'post',
+        video: p.video || undefined,
+        duration: p.video ? p.duration : undefined,
+        allowDownload: p.video ? !!p.allow_download : undefined,
+        views: p.video ? q.viewCount.get(p.id).n : undefined,
         audience: p.audience,
         whoCanComment: p.who_can_comment,
         hideLikes: !!p.hide_likes,

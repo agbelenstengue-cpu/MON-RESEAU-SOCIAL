@@ -261,6 +261,9 @@ const ADDED_COLUMNS = [
   ['messages', 'view_once', 'INTEGER NOT NULL DEFAULT 0'], // vue unique (8.9)
   ['conversations', 'message_timer', 'INTEGER NOT NULL DEFAULT 0'],
   ['users', 'privacy', 'TEXT'], // réglages de confidentialité (20.2), JSON
+  ['posts', 'video', 'TEXT'], // MIC Clips (14.2)
+  ['posts', 'duration', 'INTEGER'],
+  ['posts', 'allow_download', 'INTEGER NOT NULL DEFAULT 1'],
 ];
 
 function migrate(db) {
@@ -273,6 +276,19 @@ function migrate(db) {
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     opened_at INTEGER NOT NULL,
     PRIMARY KEY (message_id, user_id)
+  )`);
+  // Vidéos téléversées : appartiennent à leur auteur jusqu'à leur publication.
+  db.exec(`CREATE TABLE IF NOT EXISTS video_uploads (
+    url TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    used INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS post_views (
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    viewed_at INTEGER NOT NULL,
+    PRIMARY KEY (post_id, user_id)
   )`);
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_expires ON messages(expires_at) WHERE expires_at IS NOT NULL');
 }
