@@ -3,6 +3,8 @@ import { t, clock, dayLabel, listTime } from '../i18n.js';
 import { store, get, post, patch, put, del, on, sendWs, readImage } from '../api.js';
 import { html, raw, mount, $, $$, icon, avatar, richText, toast, showError, dialog, sheet, actionSheet, reportFlow, empty, skeleton, debounce } from '../ui.js';
 import { layout, go, backButton, wireBack, refreshBadges } from '../app.js';
+import { VoiceRecorder, blobToDataUrl, fmtDuration, waveformHtml, player } from '../voice.js';
+import { startCall, joinCall, inCall } from '../calls.js';
 
 const QUICK = ['❤️', '😂', '😮', '😢', '🙏', '👍'];
 const EDIT_WINDOW = 15 * 60 * 1000;
@@ -28,8 +30,16 @@ function previewText(m, c) {
   if (m.deleted) return t('chat.deleted');
   if (m.kind === 'system') return systemText(m);
   if (m.kind === 'image') return `${who}📷 ${t('chat.photo')}`;
+  if (m.kind === 'voice') return `${who}🎤 ${t('voice.message')} (${fmtDuration(m.meta?.duration)})`;
+  if (m.kind === 'call') return callText(m);
   if (m.kind === 'post') return `${who}🌍 ${t('chat.sharedPost')}`;
   return who + m.body;
+}
+
+function callText(m) {
+  const video = m.meta?.type === 'video';
+  if (m.meta?.status === 'missed') return `${video ? '📹' : '📞'} ${t(m.sender?.id === store.me.id ? 'call.noAnswerMsg' : 'call.missed')}`;
+  return `${video ? '📹' : '📞'} ${t(video ? 'call.videoCall' : 'call.audioCall')} · ${fmtDuration(m.meta?.duration)}`;
 }
 
 function systemText(m) {
@@ -67,6 +77,7 @@ export async function chatsScreen(root, { filter = 'all' } = {}) {
       html`<div class="chips" role="tablist">
           ${chip('all', t('chats.all'))} ${chip('unread', t('chats.unread'))} ${chip('groups', t('chats.groups'))}
           ${chip('requests', t('chats.requests'), requests.length ? html` · ${requests.length}` : '')}
+          <a class="chip" href="#/calls">${t('call.history')}</a>
         </div>
         ${list.length
           ? html`<ul class="list">
@@ -133,10 +144,15 @@ export async function chatScreen(root, { id }) {
         <span class="small muted" data-presence>${subtitle()}</span>
       </span>
     </a>
+    ${canCall() ? html`<button class="icon-btn" data-call="audio" aria-label="${t('call.audioCall')}">${icon('phone')}</button>
+      <button class="icon-btn" data-call="video" aria-label="${t('call.videoCall')}">${icon('video')}</button>` : ''}
     <button class="icon-btn" data-menu aria-label="${t('common.more')}">${icon('more')}</button>`;
 
+  const canCall = () => conv.status === 'active' && !(conv.type === 'direct' && (conv.blocked || !conv.peer));
+  let typingActivity = 'typing';
+
   const subtitle = () => {
-    if (typingUntil > Date.now()) return html`<span class="typing">${t('chat.typing')}</span>`;
+    if (typingUntil > Date.now()) return html`<span class="typing">${t(typingActivity === 'recording' ? 'chat.recording' : 'chat.typing')}</span>`;
     if (conv.type === 'group') return t('chat.members', { count: conv.memberCount });
     return presenceText(conv.peer);
   };
@@ -146,6 +162,7 @@ export async function chatScreen(root, { id }) {
     root,
     html`<div class="chat-screen">
       <header class="topbar" data-head></header>
+      <div data-callbar></div>
       <div class="messages" data-list role="log" aria-live="polite"></div>
       <div data-bottom></div>
     </div>`
@@ -153,11 +170,26 @@ export async function chatScreen(root, { id }) {
   const list = $('[data-list]', root);
   const head = $('[data-head]', root);
   const bottom = $('[data-bottom]', root);
+  const callbar = $('[data-callbar]', root);
+
+  // Bandeau « Appel en cours · Rejoindre » (10.2).
+  const drawCallbar = () => {
+    const c = conv.activeCall;
+    const mineActive = inCall()?.id && c && inCall().id === c.id;
+    if (!c || mineActive || !c.participants.length || c.participants.includes(store.me.id)) return mount(callbar, '');
+    mount(
+      callbar,
+      html`<div class="call-banner">${icon(c.type === 'video' ? 'video' : 'phone')}<span class="grow">${t('call.ongoing', { count: c.participants.length })}</span>
+        <button class="btn small world" data-joincall>${t('call.join')}</button></div>`
+    );
+    $('[data-joincall]', callbar).addEventListener('click', () => joinCall(conv, c));
+  };
 
   const drawHead = () => {
     mount(head, header());
     wireBack(head, 'chats');
     $('[data-menu]', head).addEventListener('click', openMenu);
+    $$('[data-call]', head).forEach((b) => b.addEventListener('click', () => startCall(conv, b.dataset.call)));
     $('[data-info]', head)?.addEventListener('click', (e) => {
       e.preventDefault();
       openGroupInfo();
@@ -166,6 +198,11 @@ export async function chatScreen(root, { id }) {
 
   const bubble = (m) => {
     if (m.kind === 'system') return html`<div class="system-msg">${systemText(m)}</div>`;
+    if (m.kind === 'call') {
+      const missed = m.meta?.status === 'missed';
+      return html`<div class="system-msg call-msg ${missed && m.sender?.id !== store.me.id ? 'missed' : ''}">${callText(m)} · ${clock(m.createdAt)}
+        ${canCall() ? html`<button class="chip" data-callback="${m.meta?.type || 'audio'}">${t('call.callBack')}</button>` : ''}</div>`;
+    }
     const mine = m.sender?.id === store.me.id;
     const showSender = conv.type === 'group' && !mine;
     const ticks =
@@ -175,6 +212,7 @@ export async function chatScreen(root, { id }) {
     let content;
     if (m.deleted) content = html`<span class="deleted">${t('chat.deleted')}</span>`;
     else if (m.kind === 'image') content = html`<img class="media" src="${m.media}" alt="${t('chat.photo')}" loading="lazy" />${m.body ? html`<div class="text">${richText(m.body)}</div>` : ''}`;
+    else if (m.kind === 'voice') content = voiceBubble(m, mine);
     else if (m.kind === 'post') content = html`${postCard(m.post)}${m.body ? html`<div class="text">${richText(m.body)}</div>` : ''}`;
     else content = html`<div class="text">${richText(m.body)}</div>`;
     const counts = {};
@@ -182,12 +220,58 @@ export async function chatScreen(root, { id }) {
     return html`<div class="bubble-row ${mine ? 'mine' : ''}" data-mid="${m.id}">
       <div class="bubble" tabindex="0">
         ${showSender ? html`<div class="sender">${m.sender?.name}</div>` : ''}
-        ${m.replyTo ? html`<div class="quote"><b>${m.replyTo.senderName}</b><br />${m.replyTo.deleted ? t('chat.deleted') : m.replyTo.kind === 'image' ? '📷 ' + t('chat.photo') : m.replyTo.body}</div>` : ''}
+        ${m.replyTo ? html`<div class="quote"><b>${m.replyTo.senderName}</b><br />${m.replyTo.deleted ? t('chat.deleted') : m.replyTo.kind === 'image' ? '📷 ' + t('chat.photo') : m.replyTo.kind === 'voice' ? '🎤 ' + t('voice.message') : m.replyTo.body}</div>` : ''}
         ${content}
         <div class="meta">${m.editedAt && !m.deleted ? html`<span>${t('chat.edited')}</span>` : ''}<span>${clock(m.createdAt)}</span>${ticks}</div>
       </div>
       ${Object.keys(counts).length ? html`<div class="reactions">${Object.entries(counts).map(([e, n]) => html`<span>${e}${n > 1 ? n : ''}</span>`)}</div>` : ''}
     </div>`;
+  };
+
+  // Bulle vocale (9.3) : lecture, onde cliquable, durée, vitesse, statut écouté.
+  const voiceBubble = (m, mine) => {
+    const s = player.state();
+    const playing = s && s.id === m.id;
+    const d = m.meta?.duration || 0;
+    return html`<div class="voice" data-voice="${m.id}">
+      <button class="vplay" data-v="play" aria-label="${playing && s.playing ? t('voice.pause') : t('voice.play')}">${icon(playing && s.playing ? 'pause' : 'play')}</button>
+      <div class="wave" data-v="seek" role="slider" aria-label="${t('voice.message')}" aria-valuemin="0" aria-valuemax="${Math.round(d / 1000)}">${waveformHtml(m.meta?.waveform, playing ? s.progress : 0)}</div>
+      <div class="vmeta">
+        <span data-vtime>${fmtDuration(playing ? s.current : d)}</span>
+        <button class="vrate" data-v="rate">${player.rate()}×</button>
+        ${mine
+          ? html`<span class="vstate ${m.played ? 'played' : ''}" title="${m.played ? t('voice.played') : ''}">${icon('mic', 'width="14" height="14"')}</span>`
+          : m.playedByMe
+            ? ''
+            : html`<span class="vdot" title="${t('voice.unplayed')}"></span>`}
+      </div>
+    </div>`;
+  };
+
+  const voiceOpts = (m) => ({
+    title: m.sender?.id === store.me.id ? t('stories.my') : m.sender?.name || '',
+    convId,
+    mine: m.sender?.id === store.me.id,
+    // Lecture continue : le vocal reçu non écouté suivant démarre automatiquement.
+    next: (cur) => {
+      const nm = messages.find((x) => x.id > cur.id && x.kind === 'voice' && !x.deleted && !x.playedByMe && x.sender?.id !== store.me.id);
+      return nm ? { message: nm, ...voiceOpts(nm) } : null;
+    },
+  });
+
+  const updateVoice = (s) => {
+    $$('[data-voice]', list).forEach((el) => {
+      const m = messages.find((x) => x.id === Number(el.dataset.voice));
+      if (!m) return;
+      const playing = s && s.id === m.id;
+      const btn = $('[data-v="play"]', el);
+      mount(btn, icon(playing && s.playing ? 'pause' : 'play'));
+      const bars = $$('.wave i', el);
+      bars.forEach((b, i) => b.classList.toggle('on', !!playing && i / bars.length < s.progress));
+      $('[data-vtime]', el).textContent = fmtDuration(playing ? s.current : m.meta?.duration);
+      $('[data-v="rate"]', el).textContent = `${player.rate()}×`;
+      if (playing && m.playedByMe) $('.vdot', el)?.remove();
+    });
   };
 
   const drawList = (keepBottom = true) => {
@@ -245,7 +329,7 @@ export async function chatScreen(root, { id }) {
       return;
     }
     const bar = replyTo
-      ? html`<div class="reply-bar"><span class="grow">${t('chat.replyingTo', { name: replyTo.sender?.name || '' })} — <span class="muted">${(replyTo.body || '📷').slice(0, 80)}</span></span><button class="icon-btn" data-cancel aria-label="${t('common.cancel')}">${icon('close')}</button></div>`
+      ? html`<div class="reply-bar"><span class="grow">${t('chat.replyingTo', { name: replyTo.sender?.name || '' })} — <span class="muted">${(replyTo.body || (replyTo.kind === 'voice' ? '🎤' : '📷')).slice(0, 80)}</span></span><button class="icon-btn" data-cancel aria-label="${t('common.cancel')}">${icon('close')}</button></div>`
       : editing
         ? html`<div class="reply-bar"><span class="grow">${t('chat.editing')}</span><button class="icon-btn" data-cancel aria-label="${t('common.cancel')}">${icon('close')}</button></div>`
         : '';
@@ -255,11 +339,20 @@ export async function chatScreen(root, { id }) {
         <form class="composer" data-composer>
           <label class="icon-btn" aria-label="${t('chat.photo')}">${icon('image')}<input type="file" accept="image/*" data-file hidden /></label>
           <textarea rows="1" data-input placeholder="${t('chat.placeholder')}" aria-label="${t('chat.placeholder')}">${editing ? editing.body : ''}</textarea>
-          <button class="send" type="submit" aria-label="${t('share.send')}">${icon('send')}</button>
+          <button class="send" type="submit" data-send aria-label="${t('share.send')}" ${editing ? '' : 'hidden'}>${icon('send')}</button>
+          ${editing ? '' : html`<button class="send mic" type="button" data-mic aria-label="${t('voice.record')}" title="${t('voice.holdHint')}">${icon('mic')}</button>`}
         </form>`
     );
     const input = $('[data-input]', bottom);
     const form = $('[data-composer]', bottom);
+    const syncButtons = () => {
+      if (editing) return;
+      const hasText = !!input.value.trim();
+      $('[data-send]', bottom).hidden = !hasText;
+      $('[data-mic]', bottom).hidden = hasText;
+    };
+    input.addEventListener('input', syncButtons);
+    $('[data-mic]', bottom)?.addEventListener('pointerdown', (e) => beginRecording(e));
     $('[data-cancel]', bottom)?.addEventListener('click', () => {
       replyTo = null;
       editing = null;
@@ -332,6 +425,169 @@ export async function chatScreen(root, { id }) {
     }
   };
 
+  // ---------- Enregistrement d'un vocal (9.1) ----------
+  let rec = null; // { recorder, locked, levels, preview, startX, startY, startT }
+  let lastRecordingSent = 0;
+
+  const beginRecording = async (e) => {
+    if (rec) return;
+    e.preventDefault();
+    const recorder = new VoiceRecorder({
+      onLevel: (lvl, dur) => {
+        if (!rec) return;
+        rec.levels.push(lvl);
+        if (rec.levels.length > 40) rec.levels.shift();
+        const time = $('[data-rtime]', bottom);
+        if (time) time.textContent = fmtDuration(dur);
+        const meter = $('[data-rlevel]', bottom);
+        if (meter) mount(meter, html`${rec.levels.map((v) => html`<i style="height:${Math.round(10 + v * 90)}%"></i>`)}`);
+        if (Date.now() - lastRecordingSent > 2500) {
+          lastRecordingSent = Date.now();
+          sendWs('typing', { conversationId: convId, activity: 'recording' });
+        }
+        if (dur > 59 * 60 * 1000 && !rec.warned) {
+          rec.warned = true;
+          toast(t('voice.oneMinuteLeft'));
+        }
+      },
+    });
+    rec = { recorder, locked: false, levels: [], startX: e.clientX, startY: e.clientY, startT: Date.now(), pointerId: e.pointerId };
+    drawRecorder();
+    window.addEventListener('pointermove', onRecMove);
+    window.addEventListener('pointerup', onRecUp);
+    try {
+      await recorder.start();
+      if (!rec) recorder.cancel();
+    } catch (err) {
+      stopListening();
+      rec = null;
+      drawBottom();
+      toast(t(`err.${err.code || 'mic_denied'}`));
+    }
+  };
+
+  const stopListening = () => {
+    window.removeEventListener('pointermove', onRecMove);
+    window.removeEventListener('pointerup', onRecUp);
+  };
+
+  // Glisser à gauche = annuler ; glisser vers le haut = verrouiller.
+  const onRecMove = (e) => {
+    if (!rec || rec.locked) return;
+    const dx = e.clientX - rec.startX;
+    const dy = e.clientY - rec.startY;
+    const hint = $('[data-rhint]', bottom);
+    if (hint) hint.style.transform = `translateX(${Math.min(0, dx)}px)`;
+    if (dx < -90) cancelRecording();
+    else if (dy < -70) lockRecording();
+  };
+
+  const onRecUp = () => {
+    if (!rec || rec.locked) return;
+    stopListening();
+    // Un simple appui verrouille (« Tap to record ») ; un appui maintenu envoie au relâchement.
+    if (Date.now() - rec.startT < 400) lockRecording();
+    else sendRecording();
+  };
+
+  const lockRecording = () => {
+    if (!rec) return;
+    stopListening();
+    rec.locked = true;
+    drawRecorder();
+  };
+
+  const cancelRecording = () => {
+    if (!rec) return;
+    stopListening();
+    rec.recorder.cancel();
+    rec = null;
+    drawBottom();
+  };
+
+  const sendRecording = async () => {
+    if (!rec) return;
+    const r = rec;
+    rec = null;
+    drawBottom();
+    const result = await r.recorder.stop();
+    if (result.duration < 700) return toast(t('voice.tooShort'));
+    try {
+      const media = await blobToDataUrl(result.blob);
+      const m = await post(`/conversations/${convId}/messages`, { kind: 'voice', media, duration: Math.round(result.duration), waveform: result.waveform, replyTo: replyTo?.id });
+      URL.revokeObjectURL(result.url);
+      replyTo = null;
+      upsert(m);
+      drawBottom();
+      drawList('force');
+    } catch (err) {
+      showError(err);
+    }
+  };
+
+  const drawRecorder = () => {
+    if (!rec) return drawBottom();
+    const st = rec.recorder.state;
+    if (rec.preview) {
+      // Écoute avant envoi.
+      mount(
+        bottom,
+        html`<div class="rec-bar">
+          <button class="icon-btn" data-r="delete" aria-label="${t('voice.delete')}" style="color:var(--garnet)">${icon('trash')}</button>
+          <button class="icon-btn" data-r="listen" aria-label="${t('voice.play')}">${icon('play')}</button>
+          <div class="wave grow">${waveformHtml(rec.preview.waveform)}</div>
+          <span class="small" data-rtime>${fmtDuration(rec.preview.duration)}</span>
+          <button class="send" data-r="send" aria-label="${t('share.send')}">${icon('send')}</button>
+        </div>`
+      );
+    } else if (rec.locked) {
+      mount(
+        bottom,
+        html`<div class="rec-bar">
+          <button class="icon-btn" data-r="delete" aria-label="${t('voice.delete')}" style="color:var(--garnet)">${icon('trash')}</button>
+          <span class="rec-dot ${st === 'paused' ? 'paused' : ''}"></span>
+          <span class="small" data-rtime>${fmtDuration(rec.recorder.duration())}</span>
+          <div class="rec-level grow" data-rlevel></div>
+          <button class="icon-btn" data-r="${st === 'paused' ? 'resume' : 'pause'}" aria-label="${st === 'paused' ? t('voice.resume') : t('voice.pause')}">${icon(st === 'paused' ? 'mic' : 'pause')}</button>
+          <button class="icon-btn" data-r="stop" aria-label="${t('voice.preview')}"><span class="stop-square"></span></button>
+          <button class="send" data-r="send" aria-label="${t('share.send')}">${icon('send')}</button>
+        </div>`
+      );
+    } else {
+      mount(
+        bottom,
+        html`<div class="rec-bar holding">
+          <span class="rec-dot"></span>
+          <span class="small" data-rtime>0:00</span>
+          <div class="rec-level grow" data-rlevel></div>
+          <span class="small muted" data-rhint>‹ ${t('voice.slideCancel')}</span>
+          <span class="rec-lock" aria-hidden="true">${icon('lock', 'width="16" height="16"')}<br />▲</span>
+          <span class="send mic recording">${icon('mic')}</span>
+        </div>`
+      );
+    }
+    $$('[data-r]', bottom).forEach((b) =>
+      b.addEventListener('click', async () => {
+        const a = b.dataset.r;
+        if (a === 'delete') {
+          if (rec.preview) URL.revokeObjectURL(rec.preview.url);
+          cancelRecording();
+        }
+        if (a === 'pause') rec.recorder.pause(), drawRecorder();
+        if (a === 'resume') rec.recorder.resume(), drawRecorder();
+        if (a === 'stop') {
+          rec.preview = await rec.recorder.stop();
+          drawRecorder();
+        }
+        if (a === 'listen') {
+          const audio = new Audio(rec.preview.url);
+          audio.play().catch(() => {});
+        }
+        if (a === 'send') sendRecording();
+      })
+    );
+  };
+
   const markRead = () => {
     const last = messages.at(-1);
     if (!last || conv.status !== 'active' || document.hidden) return;
@@ -376,6 +632,20 @@ export async function chatScreen(root, { id }) {
 
   list.addEventListener('click', (e) => {
     if (e.target.closest('a')) return;
+    const cb = e.target.closest('[data-callback]');
+    if (cb) return startCall(conv, cb.dataset.callback);
+    const v = e.target.closest('[data-v]');
+    if (v) {
+      const m = messages.find((x) => x.id === Number(v.closest('[data-voice]').dataset.voice));
+      if (!m) return;
+      if (v.dataset.v === 'play') player.toggle(m, voiceOpts(m));
+      if (v.dataset.v === 'rate') player.cycleRate();
+      if (v.dataset.v === 'seek') {
+        const r = v.getBoundingClientRect();
+        player.seek(m, (e.clientX - r.left) / r.width, voiceOpts(m));
+      }
+      return;
+    }
     const row = e.target.closest('[data-mid]');
     if (!row) return;
     const m = messages.find((x) => x.id === Number(row.dataset.mid));
@@ -490,6 +760,7 @@ export async function chatScreen(root, { id }) {
     });
 
   drawHead();
+  drawCallbar();
   drawBottom();
   try {
     messages = await get(`/conversations/${convId}/messages`);
@@ -522,6 +793,7 @@ export async function chatScreen(root, { id }) {
     }),
     on('typing', (d) => {
       if (d.conversationId !== convId) return;
+      typingActivity = d.activity || 'typing';
       typingUntil = Date.now() + 4000;
       drawHead();
       clearTimeout(typingTimer);
@@ -534,12 +806,19 @@ export async function chatScreen(root, { id }) {
         drawHead();
       }
     }),
+    on('voice:progress', (st) => updateVoice(st)),
+    on('call:update', (d) => {
+      if (d.conversationId !== convId) return;
+      conv.activeCall = d.call;
+      drawCallbar();
+    }),
     on('conversation:update', async (d) => {
       if (d.id !== convId) return;
       try {
         conv = await get(`/conversations/${convId}`);
         drawHead();
-        drawBottom();
+        drawCallbar();
+        if (!rec) drawBottom();
       } catch {
         go('chats');
       }
@@ -550,6 +829,9 @@ export async function chatScreen(root, { id }) {
   return () => {
     offs.forEach((off) => off());
     clearTimeout(typingTimer);
+    stopListening();
+    rec?.recorder.cancel();
+    rec = null;
     document.removeEventListener('visibilitychange', onVisible);
   };
 }
@@ -665,4 +947,58 @@ export async function newGroupScreen(root) {
       showError(err);
     }
   });
+}
+
+// ---------------- Historique des appels (10.7) ----------------
+export async function callsScreen(root, { filter = 'all' } = {}) {
+  const main = layout(root, {
+    universe: 'me',
+    title: t('call.history'),
+    tab: 'chats',
+    left: backButton(),
+    right: html`<button class="icon-btn" data-clear aria-label="${t('call.clear')}">${icon('trash')}</button>`,
+  });
+  wireBack(root, 'chats');
+  const load = async () => {
+    const all = await get('/calls').catch(() => []);
+    const list = filter === 'missed' ? all.filter((c) => c.missed) : all;
+    mount(
+      main,
+      html`<div class="chips">
+          <a class="chip ${filter === 'all' ? 'active' : ''}" href="#/calls">${t('chats.all')}</a>
+          <a class="chip ${filter === 'missed' ? 'active' : ''}" href="#/calls/missed">${t('call.missedFilter')}</a>
+        </div>
+        ${list.length
+          ? html`<ul class="list">${list.map(
+              (c) => html`<li class="list-item">
+                <a href="#/chat/${c.conversationId}">${c.peer ? avatar(c.peer) : avatar({ name: c.title })}</a>
+                <a class="grow" href="#/chat/${c.conversationId}" style="color:inherit;min-width:0">
+                  <span class="title" style="display:block;${c.missed ? 'color:var(--garnet)' : ''}">${c.peer?.name || c.title}${c.participants > 2 ? ` (${c.participants})` : ''}</span>
+                  <span class="preview">${c.direction === 'outgoing' ? '↗' : '↙'} ${c.missed ? t('call.missed') : c.answered ? fmtDuration(c.duration) : t('call.noAnswerMsg')} · ${listTime(c.createdAt)}</span>
+                </a>
+                <button class="icon-btn" data-again="${c.conversationId}:${c.type}" aria-label="${t('call.callBack')}" style="color:var(--accent)">${icon(c.type === 'video' ? 'video' : 'phone')}</button>
+                <button class="icon-btn" data-del="${c.id}" aria-label="${t('me.delete')}">${icon('close')}</button>
+              </li>`
+            )}</ul>`
+          : empty(t('call.empty'), t('call.emptyLead'))}`
+    );
+    $$('[data-again]', main).forEach((b) =>
+      b.addEventListener('click', async () => {
+        const [cid, type] = b.dataset.again.split(':');
+        try {
+          startCall(await get(`/conversations/${cid}`), type);
+        } catch (err) {
+          showError(err);
+        }
+      })
+    );
+    $$('[data-del]', main).forEach((b) => b.addEventListener('click', async () => (await del(`/calls/${b.dataset.del}`).catch(showError), load())));
+  };
+  $('[data-clear]', root).addEventListener('click', async () => {
+    if (!(await dialog({ title: t('call.clear'), confirm: t('me.delete'), danger: true }))) return;
+    await del('/calls/all').catch(showError);
+    load();
+  });
+  await load();
+  return on('call:ended', () => setTimeout(load, 300));
 }

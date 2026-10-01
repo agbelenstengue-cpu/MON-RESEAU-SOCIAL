@@ -3,7 +3,9 @@ import { t } from './i18n.js';
 import { store, getToken, setToken, get, on, connect, disconnect } from './api.js';
 import { html, mount, icon, $, $$, toast } from './ui.js';
 import { welcomeScreen, authScreen } from './screens/auth.js';
-import { chatsScreen, chatScreen, newChatScreen, newGroupScreen } from './screens/chats.js';
+import { chatsScreen, chatScreen, newChatScreen, newGroupScreen, callsScreen } from './screens/chats.js';
+import { initCalls, hangUp } from './calls.js';
+import './voice.js';
 import { storiesScreen } from './screens/stories.js';
 import { createScreen } from './screens/create.js';
 import { worldScreen, postScreen, tagScreen, searchScreen } from './screens/world.js';
@@ -17,6 +19,8 @@ const ROUTES = [
   ['chats', chatsScreen],
   ['chats/:filter', chatsScreen],
   ['chat/:id', chatScreen],
+  ['calls', callsScreen],
+  ['calls/:filter', callsScreen],
   ['new-chat', newChatScreen],
   ['new-group', newGroupScreen],
   ['stories', storiesScreen],
@@ -171,6 +175,7 @@ export async function signedIn(token, me) {
 }
 
 export function signOut() {
+  hangUp();
   disconnect();
   setToken(null);
   store.me = null;
@@ -178,6 +183,7 @@ export function signOut() {
 }
 
 on('logout', () => signOut());
+initCalls();
 on('message', () => refreshBadges());
 on('receipts', () => refreshBadges());
 on('notification', () => $$('[data-notif-dot]').forEach((el) => (el.hidden = false)));
