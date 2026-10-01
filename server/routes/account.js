@@ -8,14 +8,35 @@ const OTP_MAX_PER_HOUR = 5;
 const MIN_AGE = 13; // à fixer par pays avec le juridique (section 23)
 const ADULT_AGE = 18;
 const LANGUAGES = ['en', 'fr', 'es', 'pt', 'ar', 'sw']; // langues de lancement (3.2)
+// Serveur en ligne sans fournisseur de SMS : le numéro sert d'identifiant et un mot
+// de passe protège le compte (MIC_AUTH=password). Sinon, code OTP (affiché en dev).
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 128;
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_WINDOW = 15 * 60 * 1000;
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.scryptSync(password, salt, 32);
+  return `scrypt$${salt.toString('hex')}$${hash.toString('hex')}`;
+}
+
+function checkPassword(password, stored) {
+  const [scheme, saltHex, hashHex] = String(stored || '').split('$');
+  if (scheme !== 'scrypt' || !saltHex || !hashHex) return false;
+  const expected = Buffer.from(hashHex, 'hex');
+  const actual = crypto.scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length);
+  return crypto.timingSafeEqual(actual, expected);
+}
 
 export function normalizePhone(raw) {
   const digits = String(raw ?? '').replace(/[\s().-]/g, '');
   return /^\+[1-9]\d{7,14}$/.test(digits) ? digits : null;
 }
 
-export default function accountRoutes(api, { db, views, hub, saveMedia, HttpError, devOtp, moderators = [] }, requireAuth) {
-  const tickets = new Map(); // ticket d'inscription -> { phone, expires }
+export default function accountRoutes(api, { db, views, hub, saveMedia, HttpError, devOtp, authMode = 'otp', moderators = [] }, requireAuth) {
+  const tickets = new Map(); // ticket d'inscription -> { phone, expires, passwordHash? }
+  const loginFails = new Map(); // numéro -> { n, since }
 
   const q = {
     recentOtps: db.prepare('SELECT COUNT(*) AS n FROM otps WHERE phone = ? AND created_at > ?'),
@@ -26,8 +47,8 @@ export default function accountRoutes(api, { db, views, hub, saveMedia, HttpErro
     userByPhone: db.prepare('SELECT * FROM users WHERE phone = ?'),
     userByName: db.prepare('SELECT id FROM users WHERE username = ?'),
     insertUser: db.prepare(`INSERT INTO users
-      (phone, username, display_name, birth_date, language, country, world_enabled, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+      (phone, username, display_name, birth_date, language, country, world_enabled, created_at, password_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`),
     insertSession: db.prepare('INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)'),
     deleteSession: db.prepare('DELETE FROM sessions WHERE token = ?'),
     user: db.prepare('SELECT * FROM users WHERE id = ?'),
@@ -50,10 +71,18 @@ export default function accountRoutes(api, { db, views, hub, saveMedia, HttpErro
     return out;
   };
 
+  const newTicket = (data) => {
+    const ticket = crypto.randomBytes(24).toString('hex');
+    tickets.set(ticket, { ...data, expires: now() + 30 * 60 * 1000 });
+    return ticket;
+  };
+
   // Étape 1 : envoi du code (le SMS est simulé tant qu'aucun fournisseur n'est branché).
+  // En mode mot de passe : indique seulement s'il faut se connecter ou créer le compte.
   api.post('/auth/request-otp', (req, res) => {
     const phone = normalizePhone(req.body?.phone);
     if (!phone) throw new HttpError(400, 'invalid_phone');
+    if (authMode === 'password') return res.json({ sent: false, mode: 'password', phone, exists: !!q.userByPhone.get(phone) });
     if (q.recentOtps.get(phone, now() - 3600_000).n >= OTP_MAX_PER_HOUR) throw new HttpError(429, 'too_many_codes');
     const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
     q.insertOtp.run(phone, code, now() + OTP_TTL, now());
@@ -61,8 +90,35 @@ export default function accountRoutes(api, { db, views, hub, saveMedia, HttpErro
     res.json({ sent: true, phone, ...(devOtp ? { devCode: code } : {}) });
   });
 
+  // Mode mot de passe : connexion (compte existant) ou début d'inscription (create).
+  api.post('/auth/password', (req, res) => {
+    if (authMode !== 'password') throw new HttpError(404, 'not_found');
+    const phone = normalizePhone(req.body?.phone);
+    if (!phone) throw new HttpError(400, 'invalid_phone');
+    const password = String(req.body?.password ?? '');
+    const user = q.userByPhone.get(phone);
+    if (req.body?.create) {
+      if (user) throw new HttpError(409, 'phone_taken');
+      if (password.length < PASSWORD_MIN) throw new HttpError(400, 'password_too_short');
+      if (password.length > PASSWORD_MAX) throw new HttpError(400, 'password_too_long');
+      return res.json({ needsSignup: true, ticket: newTicket({ phone, passwordHash: hashPassword(password) }) });
+    }
+    const fails = loginFails.get(phone);
+    if (fails && fails.since > now() - LOGIN_WINDOW && fails.n >= LOGIN_MAX_FAILS) throw new HttpError(429, 'too_many_logins');
+    if (!user || !password || password.length > PASSWORD_MAX || !checkPassword(password, user.password_hash)) {
+      const f = fails && fails.since > now() - LOGIN_WINDOW ? fails : { n: 0, since: now() };
+      f.n++;
+      loginFails.set(phone, f);
+      throw new HttpError(400, 'wrong_password');
+    }
+    loginFails.delete(phone);
+    if (user.banned) throw new HttpError(403, 'account_banned');
+    res.json({ token: newSession(user.id), user: views.selfAccount(user) });
+  });
+
   // Étape 2 : vérification. Compte existant → connexion ; sinon ticket d'inscription.
   api.post('/auth/verify', (req, res) => {
+    if (authMode === 'password') throw new HttpError(404, 'not_found');
     const phone = normalizePhone(req.body?.phone);
     const code = String(req.body?.code ?? '').replace(/\D/g, '').padEnd(6, 'x').slice(0, 6);
     const otp = phone && q.lastOtp.get(phone);
@@ -76,9 +132,7 @@ export default function accountRoutes(api, { db, views, hub, saveMedia, HttpErro
     const user = q.userByPhone.get(phone);
     if (user?.banned) throw new HttpError(403, 'account_banned');
     if (user) return res.json({ token: newSession(user.id), user: views.selfAccount(user) });
-    const ticket = crypto.randomBytes(24).toString('hex');
-    tickets.set(ticket, { phone, expires: now() + 30 * 60 * 1000 });
-    res.json({ needsSignup: true, ticket });
+    res.json({ needsSignup: true, ticket: newTicket({ phone }) });
   });
 
   api.get('/auth/username', (req, res) => {
@@ -92,7 +146,7 @@ export default function accountRoutes(api, { db, views, hub, saveMedia, HttpErro
   api.post('/auth/signup', (req, res) => {
     const { ticket, birthDate, displayName, username, joinWorld, language, country } = req.body ?? {};
     const t = tickets.get(ticket);
-    if (!t || t.expires < now()) throw new HttpError(400, 'signup_expired');
+    if (!t || t.expires < now() || (authMode === 'password' && !t.passwordHash)) throw new HttpError(400, 'signup_expired');
     const age = ageFromBirthDate(String(birthDate ?? ''));
     if (Number.isNaN(age) || age > 120) throw new HttpError(400, 'invalid_birth_date');
     if (age < MIN_AGE) {
@@ -108,7 +162,7 @@ export default function accountRoutes(api, { db, views, hub, saveMedia, HttpErro
     // Mineurs : « Stay private » uniquement (23).
     const world = joinWorld && age >= ADULT_AGE ? 1 : 0;
     const lang = LANGUAGES.includes(language) ? language : 'en';
-    const info = q.insertUser.run(t.phone, handle, name, birthDate, lang, String(country || 'CM').slice(0, 2), world, now());
+    const info = q.insertUser.run(t.phone, handle, name, birthDate, lang, String(country || 'CM').slice(0, 2), world, now(), t.passwordHash ?? null);
     tickets.delete(ticket);
     if (moderators.includes(handle)) db.prepare("UPDATE users SET role = 'moderator' WHERE id = ?").run(Number(info.lastInsertRowid));
     const user = q.user.get(Number(info.lastInsertRowid));
@@ -187,6 +241,20 @@ export default function accountRoutes(api, { db, views, hub, saveMedia, HttpErro
     }
     db.prepare('UPDATE users SET privacy = ? WHERE id = ?').run(JSON.stringify(merged), req.user.id);
     res.json(privacyView(q.user.get(req.user.id)));
+  });
+
+  // Changement de mot de passe (serveur en ligne).
+  api.post('/me/password', requireAuth, (req, res) => {
+    if (authMode !== 'password') throw new HttpError(404, 'not_found');
+    const current = String(req.body?.current ?? '');
+    const next = String(req.body?.next ?? '');
+    if (!checkPassword(current, req.user.password_hash)) throw new HttpError(400, 'wrong_password');
+    if (next.length < PASSWORD_MIN) throw new HttpError(400, 'password_too_short');
+    if (next.length > PASSWORD_MAX) throw new HttpError(400, 'password_too_long');
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(next), req.user.id);
+    // Les autres appareils sont déconnectés.
+    db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(req.user.id, req.token);
+    res.json({ ok: true });
   });
 
   // 5.8 : suppression du compte (immédiate dans ce prototype).

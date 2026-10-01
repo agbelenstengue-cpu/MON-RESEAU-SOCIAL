@@ -168,7 +168,7 @@ export function dialog({ title, body = '', confirm = t('common.confirm'), cancel
       html`<div class="box">
         <h3>${title}</h3>
         ${body ? html`<p class="muted">${body}</p>` : ''}
-        ${input ? html`<input class="input" data-input placeholder="${input.placeholder || ''}" value="${input.value || ''}" />` : ''}
+        ${input ? html`<input class="input" data-input type="${input.type || 'text'}" placeholder="${input.placeholder || ''}" value="${input.value || ''}" ${input.type === 'password' ? 'autocomplete="current-password"' : ''} />` : ''}
         <div class="buttons">
           ${cancel ? html`<button class="btn ghost" data-no>${cancel}</button>` : ''}
           <button class="btn ${danger ? 'danger' : ''}" data-yes>${confirm}</button>

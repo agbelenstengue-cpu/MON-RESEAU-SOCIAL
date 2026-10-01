@@ -655,5 +655,21 @@ export default {
   "err.media_too_large": "Este arquivo é grande demais (máx. 5 MB).",
   "err.minor_world_private_only": "Antes dos 18 anos, sua conta World precisa ser privada.",
   "err.admins_only": "Só administradores podem enviar mensagens.",
-  "err.confirmation_required": "Digite seu @usuário para confirmar."
+  "err.confirmation_required": "Digite seu @usuário para confirmar.",
+  "auth.passwordTitle": "Sua senha",
+  "auth.passwordLead": "Digite a senha da conta {phone}.",
+  "auth.newPasswordTitle": "Escolha uma senha",
+  "auth.newPasswordLead": "Com o seu número {phone}, ela permitirá entrar em todos os seus aparelhos. Mínimo de 8 caracteres.",
+  "auth.password": "Senha",
+  "auth.passwordConfirm": "Confirme a senha",
+  "err.wrong_password": "Número ou senha incorretos.",
+  "err.password_too_short": "A senha deve ter pelo menos 8 caracteres.",
+  "err.password_too_long": "A senha é longa demais.",
+  "err.password_mismatch": "As duas senhas são diferentes.",
+  "err.phone_taken": "Já existe uma conta com este número. Entre nela.",
+  "err.too_many_logins": "Tentativas demais. Tente novamente em 15 minutos.",
+  "settings.password": "Alterar a senha",
+  "settings.passwordCurrent": "Sua senha atual:",
+  "settings.passwordNew": "Sua nova senha (mínimo de 8 caracteres). Seus outros aparelhos serão desconectados.",
+  "settings.passwordChanged": "Senha alterada."
 };

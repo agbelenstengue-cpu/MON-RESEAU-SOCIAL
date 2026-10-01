@@ -49,6 +49,7 @@ export function makeViews(db, social, hub) {
       return {
         id: u.id,
         phone: u.phone,
+        hasPassword: !!u.password_hash,
         username: u.username,
         displayName: u.display_name,
         about: u.about,

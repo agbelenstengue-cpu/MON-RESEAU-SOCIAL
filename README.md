@@ -13,6 +13,37 @@ Prototype web fonctionnel du réseau social **MIC**, construit à partir du
 Rien ne passe de Me à World sans une action explicite, grâce au **sélecteur
 d'audience** « Share with… » (section 4.5 du cahier).
 
+## Mettre MIC en ligne (réseau partagé)
+
+Pour que plusieurs personnes se voient, s'abonnent, s'écrivent et s'appellent,
+toutes doivent utiliser **le même serveur MIC en ligne**.
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/agbelenstengue-cpu/MON-RESEAU-SOCIAL)
+
+1. Cliquez sur le bouton ci-dessus, connectez-vous à Render avec votre compte
+   GitHub, ajoutez une carte bancaire, puis **Deploy Blueprint**. Le fichier
+   `render.yaml` crée le service : formule *Starter* (environ 7 $ par mois) et
+   disque permanent de 1 Go (0,25 $ par mois) pour la base et les photos,
+   vocaux et vidéos.
+2. Après quelques minutes, Render donne l'adresse du site, par exemple
+   `https://mic-xxxx.onrender.com`. Ouvrez-la : c'est MIC, en https.
+3. Sur un téléphone, ouvrez cette adresse dans Chrome, puis menu ⋮ → **Ajouter à
+   l'écran d'accueil** (ou **Installer l'application**) : MIC s'installe comme
+   une application, sans APK.
+4. Pour que l'APK Android et le .exe Windows ouvrent ce serveur, inscrivez son
+   adresse dans `mic.config.json` (`"server": "https://mic-xxxx.onrender.com"`) :
+   le workflow « Applications MIC » reconstruit les applications.
+
+En ligne, il n'y a pas de SMS : on s'inscrit avec son **numéro et un mot de
+passe** (`MIC_AUTH=password`), modifiable dans Moi → Réglages. Pour désigner des
+modérateurs, ajoutez dans Render la variable `MIC_MODERATORS` (liste de
+@username séparés par des virgules). Chaque envoi sur la branche par défaut met
+le serveur à jour ; les données du disque sont conservées.
+
+Les appels passent directement d'un téléphone à l'autre (WebRTC). Sur certains
+réseaux mobiles, il faut en plus un serveur relais TURN (variable
+`MIC_ICE_SERVERS`, voir plus bas).
+
 ## Démarrer
 
 Prérequis : **Node.js 22.5 ou plus récent** (la base SQLite intégrée `node:sqlite` est utilisée).
@@ -79,8 +110,10 @@ npm run desktop:win   # construire le .exe (sous Windows)
 Le workflow « Applications MIC » construit aussi `MIC-<version>.apk` (Android 7.0
 et plus récent) et le publie dans la même version des **Releases**.
 
-Comme l'application Windows, l'APK fonctionne **seul dans le téléphone**, sans
-serveur ni adresse à saisir. Le code du serveur MIC (`server/`, le même que sur
+Quand `mic.config.json` contient l'adresse du serveur en ligne, l'APK ouvre ce
+MIC partagé (page « Pas de connexion » avec « Réessayer » hors réseau), comme le
+.exe. Sinon, comme l'application Windows, l'APK fonctionne **seul dans le
+téléphone**, sans serveur ni adresse à saisir. Le code du serveur MIC (`server/`, le même que sur
 PC) est regroupé avec l'interface et tourne dans l'application (Capacitor,
 dossier `mobile/`) :
 

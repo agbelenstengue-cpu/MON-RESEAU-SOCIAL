@@ -1,6 +1,6 @@
 // Service worker MIC (26.4) : l'application s'ouvre hors ligne et les discussions
 // déjà téléchargées restent lisibles. Rien n'est mis en cache pour les envois.
-const VERSION = 'mic-v2';
+const VERSION = 'mic-v3';
 const SHELL = ['/', '/index.html', '/css/styles.css', '/js/app.js', '/favicon.svg', '/manifest.webmanifest'];
 // Lectures d'API utiles hors ligne : réseau d'abord, cache en secours.
 const OFFLINE_API = [/^\/api\/me$/, /^\/api\/conversations(\/\d+(\/messages)?)?$/, /^\/api\/friends$/, /^\/api\/stories$/, /^\/api\/channels$/, /^\/api\/calls$/];

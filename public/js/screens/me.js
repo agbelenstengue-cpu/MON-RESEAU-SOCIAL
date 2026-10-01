@@ -7,6 +7,7 @@ import { renderPosts } from './world.js';
 import { openViewer } from './stories.js';
 import { ensureWorld } from './create.js';
 import { dataSaver, setDataSaver, networkUsage, fmtBytes } from '../datasaver.js';
+import { saveFile } from '../download.js';
 
 const meCard = () => ({ id: store.me.id, name: store.me.displayName, avatar: store.me.avatar, username: store.me.username });
 
@@ -466,6 +467,11 @@ export async function settingsScreen(root) {
             ? blocked.map((u) => html`<div class="list-item">${avatar(u, 'xs')}<span class="grow title">${u.name}</span><button class="btn small ghost" data-unblock="${u.id}">${t('profile.unblock')}</button></div>`)
             : html`<div class="list-item muted small">${t('settings.noBlocked')}</div>`}
         </div>
+        ${store.me.hasPassword
+          ? html`<div class="menu-group">
+              <button class="list-item" data-password>${icon('lock')}<span class="grow">${t('settings.password')}</span></button>
+            </div>`
+          : ''}
         <div class="menu-group">
           <button class="list-item" data-logout>${icon('logout')}<span class="grow">${t('settings.logout')}</span></button>
           <button class="list-item" data-delete style="color:var(--garnet)">${icon('trash')}<span class="grow">${t('account.delete')}</span></button>
@@ -507,6 +513,19 @@ export async function settingsScreen(root) {
       setDataSaver(e.target.checked);
       toast(t('common.done'));
     });
+    // Changement de mot de passe (serveur en ligne).
+    $('[data-password]', main)?.addEventListener('click', async () => {
+      const current = await dialog({ title: t('settings.password'), body: t('settings.passwordCurrent'), confirm: t('auth.next'), input: { type: 'password' } });
+      if (!current) return;
+      const next = await dialog({ title: t('settings.password'), body: t('settings.passwordNew'), confirm: t('common.done'), input: { type: 'password' } });
+      if (!next) return;
+      try {
+        await post('/me/password', { current, next });
+        toast(t('settings.passwordChanged'));
+      } catch (err) {
+        showError(err);
+      }
+    });
     // 24.2 : « Download my data ».
     $$('[data-export]', main).forEach((b) =>
       b.addEventListener('click', async () => {
@@ -514,12 +533,7 @@ export async function settingsScreen(root) {
           const fmt = b.dataset.export;
           const res = await fetch(`/api/me/export${fmt === 'html' ? '?format=html' : ''}`, { headers: { authorization: `Bearer ${getToken()}` } });
           if (!res.ok) throw new Error('export');
-          const url = URL.createObjectURL(await res.blob());
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `mic-${store.me.username}.${fmt}`;
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          await saveFile(await res.blob(), `mic-${store.me.username}.${fmt}`);
         } catch {
           toast(t('err.generic'));
         }

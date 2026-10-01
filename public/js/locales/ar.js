@@ -655,5 +655,21 @@ export default {
   "err.media_too_large": "هذا الملف كبير جدًا (5 ميغابايت كحد أقصى).",
   "err.minor_world_private_only": "قبل سن 18، يجب أن يكون حساب World خاصًا.",
   "err.admins_only": "المشرفون فقط يمكنهم إرسال الرسائل.",
-  "err.confirmation_required": "اكتب @اسم المستخدم للتأكيد."
+  "err.confirmation_required": "اكتب @اسم المستخدم للتأكيد.",
+  "auth.passwordTitle": "كلمة المرور",
+  "auth.passwordLead": "أدخل كلمة مرور الحساب {phone}.",
+  "auth.newPasswordTitle": "اختر كلمة مرور",
+  "auth.newPasswordLead": "مع رقمك {phone}، ستتيح لك تسجيل الدخول على جميع أجهزتك. 8 أحرف على الأقل.",
+  "auth.password": "كلمة المرور",
+  "auth.passwordConfirm": "أكّد كلمة المرور",
+  "err.wrong_password": "الرقم أو كلمة المرور غير صحيحة.",
+  "err.password_too_short": "يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل.",
+  "err.password_too_long": "كلمة المرور طويلة جدًا.",
+  "err.password_mismatch": "كلمتا المرور غير متطابقتين.",
+  "err.phone_taken": "يوجد حساب بهذا الرقم بالفعل. سجّل الدخول.",
+  "err.too_many_logins": "محاولات كثيرة جدًا. أعد المحاولة بعد 15 دقيقة.",
+  "settings.password": "تغيير كلمة المرور",
+  "settings.passwordCurrent": "كلمة المرور الحالية:",
+  "settings.passwordNew": "كلمة المرور الجديدة (8 أحرف على الأقل). سيتم تسجيل خروج أجهزتك الأخرى.",
+  "settings.passwordChanged": "تم تغيير كلمة المرور."
 };

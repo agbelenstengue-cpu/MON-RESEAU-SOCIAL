@@ -33,7 +33,8 @@
       "electron/**",
       "server/**",
       "public/**",
-      "package.json"
+      "package.json",
+      "mic.config.json"
     ],
     "win": {
       "target": [

@@ -1,0 +1,21 @@
+# Mise en ligne de MIC sur Render : bouton « Deploy to Render » du README.
+# Disque permanent monté sur /data : base SQLite et fichiers téléversés.
+services:
+  - type: web
+    name: mic
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: mic-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: MIC_AUTH
+        value: password
+      - key: MIC_DB
+        value: /data/mic.db
+      - key: MIC_UPLOADS
+        value: /data/uploads

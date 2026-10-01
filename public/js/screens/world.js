@@ -4,6 +4,7 @@ import { store, get, post, patch, del } from '../api.js';
 import { html, raw, mount, $, $$, icon, avatar, richText, toast, showError, dialog, sheet, actionSheet, reportFlow, empty, skeleton, debounce } from '../ui.js';
 import { layout, go, backButton, wireBack } from '../app.js';
 import { ensureWorld } from './create.js';
+import { saveFile } from '../download.js';
 
 const AUD_ICON = { everyone: '🌍', followers: '👥', friends: '🤝', only_me: '🔒' };
 
@@ -222,12 +223,7 @@ function postMenu(p, { redraw, remove }) {
     items.push({
       label: t('clip.download'),
       icon: 'archive',
-      run: () => {
-        const a = document.createElement('a');
-        a.href = p.video;
-        a.download = `mic-clip-${p.id}`;
-        a.click();
-      },
+      run: () => saveFile(p.video, `mic-clip-${p.id}`).catch(showError),
     });
   }
   if (p.mine) {

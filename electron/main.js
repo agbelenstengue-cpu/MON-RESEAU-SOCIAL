@@ -14,6 +14,16 @@ const HOST = '127.0.0.1';
 const PREFERRED_PORT = 37237;
 const LAN_PORT = 37238;
 
+// Adresse du serveur MIC en ligne (mic.config.json). Vide : MIC tourne sur ce PC.
+const CONFIG = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'mic.config.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+})();
+const ONLINE = /^https?:\/\//.test(CONFIG.server || '') ? new URL(CONFIG.server).origin : null;
+
 if (!app.requestSingleInstanceLock()) app.quit();
 
 let win = null;
@@ -65,7 +75,7 @@ function stopLan() {
 }
 
 function updateTitle() {
-  if (!win) return;
+  if (!win || ONLINE) return;
   const [first] = lanAddresses();
   win.setTitle(lanServer && first ? `MIC — partagé : ${first}` : 'MIC');
 }
@@ -124,13 +134,13 @@ async function setLan(enabled) {
 function buildMenu() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      {
+      ...(ONLINE ? [] : [{
         label: 'Partage',
         submenu: [
           { label: 'Partager sur le réseau local', type: 'checkbox', checked: !!lanServer, click: (item) => setLan(item.checked) },
           { label: 'Adresse à ouvrir sur les autres appareils…', click: showLanAddress },
         ],
-      },
+      }]),
       {
         label: 'Affichage',
         submenu: [
@@ -233,6 +243,21 @@ function createWindow() {
   win.on('page-title-updated', (event) => event.preventDefault());
   win.webContents.on('did-finish-load', updateTitle);
 
+  // En ligne : sans connexion Internet, proposer de réessayer.
+  win.webContents.on('did-fail-load', (event, code, description, url, isMainFrame) => {
+    if (!isMainFrame || code === -3) return;
+    dialog
+      .showMessageBox(win, {
+        type: 'warning',
+        title: 'MIC',
+        buttons: ['Réessayer', 'Quitter'],
+        defaultId: 0,
+        message: 'MIC ne parvient pas à joindre le serveur.',
+        detail: 'Vérifiez votre connexion Internet, puis réessayez.',
+      })
+      .then(({ response }) => (response === 0 ? win?.loadURL(baseUrl) : app.quit()));
+  });
+
   win.loadURL(baseUrl);
   win.on('closed', () => {
     win = null;
@@ -254,14 +279,17 @@ app.on('activate', () => {
 });
 
 app.whenReady().then(async () => {
-  try {
-    baseUrl = await startServer();
-  } catch (err) {
-    dialog.showErrorBox('MIC', `MIC n'a pas pu démarrer.\n\n${err?.stack || err}`);
-    app.quit();
-    return;
+  if (ONLINE) baseUrl = ONLINE;
+  else {
+    try {
+      baseUrl = await startServer();
+    } catch (err) {
+      dialog.showErrorBox('MIC', `MIC n'a pas pu démarrer.\n\n${err?.stack || err}`);
+      app.quit();
+      return;
+    }
+    if (readSettings().lan) await startLan().catch(() => {});
   }
-  if (readSettings().lan) await startLan().catch(() => {});
   buildMenu();
   createWindow();
 });

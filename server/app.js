@@ -33,6 +33,7 @@ export function createServer({
   dbFile = path.join(ROOT, 'data', 'mic.db'),
   uploadsDir = path.join(ROOT, 'data', 'uploads'),
   devOtp = process.env.NODE_ENV !== 'production',
+  authMode = process.env.MIC_AUTH === 'password' ? 'password' : 'otp',
 } = {}) {
   const db = openDatabase(dbFile);
   const hub = createHub();
@@ -113,7 +114,7 @@ export function createServer({
   const mods = (process.env.MIC_MODERATORS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
   if (mods.length) db.prepare(`UPDATE users SET role = 'moderator' WHERE username IN (${mods.map(() => '?').join(',')})`).run(...mods);
 
-  const ctx = { assertNotRestricted, moderators: mods, db, social, views, hub, notify, saveMedia, deleteMedia, uploadsDir, HttpError, devOtp, authenticate };
+  const ctx = { assertNotRestricted, moderators: mods, db, social, views, hub, notify, saveMedia, deleteMedia, uploadsDir, HttpError, devOtp, authMode, authenticate };
 
   const api = express.Router();
   accountRoutes(api, ctx, requireAuth);
@@ -129,6 +130,8 @@ export function createServer({
   worldRoutes(api, ctx);
   api.use((req, res, next) => next(new HttpError(404, 'not_found')));
 
+  // Contrôle de santé pour l'hébergeur.
+  app.get('/api/health', (req, res) => res.json({ ok: true }));
   app.use('/api', api);
   app.use('/uploads', express.static(uploadsDir, { maxAge: '7d', immutable: true }));
   app.use(express.static(path.join(ROOT, 'public')));

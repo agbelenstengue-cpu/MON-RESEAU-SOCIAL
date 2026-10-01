@@ -274,6 +274,7 @@ const ADDED_COLUMNS = [
   ['posts', 'video', 'TEXT'], // MIC Clips (14.2)
   ['posts', 'duration', 'INTEGER'],
   ['posts', 'allow_download', 'INTEGER NOT NULL DEFAULT 1'],
+  ['users', 'password_hash', 'TEXT'], // serveur en ligne : connexion par mot de passe
 ];
 
 function migrate(db) {

@@ -655,5 +655,21 @@ export default {
   "err.media_too_large": "Este archivo es demasiado grande (máx. 5 MB).",
   "err.minor_world_private_only": "Antes de los 18 años, tu cuenta World debe ser privada.",
   "err.admins_only": "Solo los administradores pueden enviar mensajes.",
-  "err.confirmation_required": "Escribe tu @usuario para confirmar."
+  "err.confirmation_required": "Escribe tu @usuario para confirmar.",
+  "auth.passwordTitle": "Tu contraseña",
+  "auth.passwordLead": "Escribe la contraseña de la cuenta {phone}.",
+  "auth.newPasswordTitle": "Elige una contraseña",
+  "auth.newPasswordLead": "Con tu número {phone}, te permitirá iniciar sesión en todos tus dispositivos. Mínimo 8 caracteres.",
+  "auth.password": "Contraseña",
+  "auth.passwordConfirm": "Confirma la contraseña",
+  "err.wrong_password": "Número o contraseña incorrectos.",
+  "err.password_too_short": "La contraseña debe tener al menos 8 caracteres.",
+  "err.password_too_long": "La contraseña es demasiado larga.",
+  "err.password_mismatch": "Las dos contraseñas no coinciden.",
+  "err.phone_taken": "Ya hay una cuenta con este número. Inicia sesión.",
+  "err.too_many_logins": "Demasiados intentos. Vuelve a intentarlo en 15 minutos.",
+  "settings.password": "Cambiar la contraseña",
+  "settings.passwordCurrent": "Tu contraseña actual:",
+  "settings.passwordNew": "Tu nueva contraseña (mínimo 8 caracteres). Se cerrará la sesión en tus otros dispositivos.",
+  "settings.passwordChanged": "Contraseña cambiada."
 };

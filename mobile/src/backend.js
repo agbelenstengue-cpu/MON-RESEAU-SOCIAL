@@ -8,7 +8,6 @@ import { Buffer } from 'buffer';
 import { configureSqlite } from './shims/sqlite.js';
 import { openLocalSocket } from './shims/ws.js';
 import { mediaStore } from './media-store.js';
-import { installDownloads } from './downloads.js';
 import { createServer } from '../../server/app.js';
 import { seedDemo } from '../../server/demo.js';
 
@@ -195,7 +194,5 @@ try {
   /* ignore */
 }
 addEventListener('offline', (e) => e.stopImmediatePropagation(), true);
-
-installDownloads();
 
 window.__micLocal = { ready, save: saveNow };

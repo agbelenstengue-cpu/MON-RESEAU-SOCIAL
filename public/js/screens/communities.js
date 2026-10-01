@@ -6,6 +6,7 @@ import { layout, go, backButton, wireBack } from '../app.js';
 import { renderPosts } from './world.js';
 import { ensureWorld } from './create.js';
 import { pickPeople } from './chats.js';
+import { saveFile } from '../download.js';
 
 const CATEGORIES = ['education', 'business', 'culture', 'sport', 'faith', 'tech', 'food', 'local', 'other'];
 const cAvatar = (c, size = '') => avatar({ name: c.name, avatar: c.avatar }, size);
@@ -402,12 +403,7 @@ export async function eventScreen(root, { id }) {
     );
     $('[data-ics]', main).addEventListener('click', async () => {
       const res = await fetch(`/api/events/${id}/ics`, { headers: { authorization: `Bearer ${getToken()}` } });
-      const url = URL.createObjectURL(await res.blob());
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `mic-event-${id}.ics`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      await saveFile(await res.blob(), `mic-event-${id}.ics`).catch(showError);
     });
     $('[data-cancel]', main)?.addEventListener('click', async () => {
       if (!(await dialog({ title: t('event.cancel'), body: t('event.cancelLead'), danger: true, confirm: t('event.cancel') }))) return;

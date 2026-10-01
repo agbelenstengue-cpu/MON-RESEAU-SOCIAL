@@ -64,7 +64,7 @@ export function welcomeScreen(root) {
 
 export function authScreen(root) {
   setUniverse('me');
-  const state = { step: 'phone', country: 'CM', number: '', phone: '', devCode: null, ticket: null, birthDate: '', displayName: '', username: '', joinWorld: true };
+  const state = { step: 'phone', mode: 'otp', exists: false, country: 'CM', number: '', phone: '', devCode: null, ticket: null, birthDate: '', displayName: '', username: '', joinWorld: true };
   let resendTimer = null;
 
   const age = () => {
@@ -84,7 +84,7 @@ export function authScreen(root) {
     <section class="steps">${body}</section>`;
 
   const prev = () => {
-    const order = ['phone', 'code', 'birthday', 'identity', 'start'];
+    const order = ['phone', state.mode === 'password' ? 'password' : 'code', 'birthday', 'identity', 'start'];
     const i = order.indexOf(state.step);
     if (i <= 0 || state.step === 'birthday') return go('welcome');
     state.step = order[i - 1];
@@ -131,6 +131,34 @@ export function authScreen(root) {
           <button class="btn block" type="submit">${t('auth.next')}</button>
           <button class="btn ghost block" type="button" data-resend style="margin-top:8px" disabled>${t('auth.resendIn', { s: 30 })}</button>
         </form>`;
+    },
+    // Serveur en ligne : mot de passe au lieu du code SMS.
+    password() {
+      return state.exists
+        ? html`<h2>${t('auth.passwordTitle')}</h2>
+            <p class="lead">${t('auth.passwordLead', { phone: state.phone })}</p>
+            <form data-form>
+              <div class="field">
+                <label for="pw">${t('auth.password')}</label>
+                <input class="input" id="pw" data-password type="password" autocomplete="current-password" required />
+              </div>
+              <p class="error" data-error role="alert"></p>
+              <button class="btn block" type="submit">${t('auth.next')}</button>
+            </form>`
+        : html`<h2>${t('auth.newPasswordTitle')}</h2>
+            <p class="lead">${t('auth.newPasswordLead', { phone: state.phone })}</p>
+            <form data-form>
+              <div class="field">
+                <label for="pw">${t('auth.password')}</label>
+                <input class="input" id="pw" data-password type="password" autocomplete="new-password" minlength="8" required />
+              </div>
+              <div class="field">
+                <label for="pw2">${t('auth.passwordConfirm')}</label>
+                <input class="input" id="pw2" data-password2 type="password" autocomplete="new-password" minlength="8" required />
+              </div>
+              <p class="error" data-error role="alert"></p>
+              <button class="btn block" type="submit">${t('auth.next')}</button>
+            </form>`;
     },
     birthday() {
       return html`<h2>${t('auth.birthdayTitle')}</h2>
@@ -196,6 +224,8 @@ export function authScreen(root) {
   const requestCode = async () => {
     const r = await post('/auth/request-otp', { phone: state.phone });
     state.devCode = r.devCode || null;
+    state.mode = r.mode === 'password' ? 'password' : 'otp';
+    state.exists = !!r.exists;
   };
 
   const submit = {
@@ -204,7 +234,19 @@ export function authScreen(root) {
       state.number = $('[data-number]', root).value.trim();
       state.phone = c[3] + state.number.replace(/\D/g, '').replace(/^0+/, '');
       await requestCode();
-      state.step = 'code';
+      state.step = state.mode === 'password' ? 'password' : 'code';
+    },
+    async password() {
+      const password = $('[data-password]', root).value;
+      if (state.exists) {
+        const r = await post('/auth/password', { phone: state.phone, password });
+        return signedIn(r.token, r.user);
+      }
+      if (password.length < 8) throw { code: 'password_too_short' };
+      if (password !== $('[data-password2]', root).value) throw { code: 'password_mismatch' };
+      const r = await post('/auth/password', { phone: state.phone, password, create: true });
+      state.ticket = r.ticket;
+      state.step = 'birthday';
     },
     async code() {
       const r = await post('/auth/verify', { phone: state.phone, code: $('[data-code]', root).value.trim() });
@@ -272,6 +314,7 @@ export function authScreen(root) {
       });
       $('[data-number]', root).focus();
     }
+    if (state.step === 'password') $('[data-password]', root).focus();
     if (state.step === 'code') {
       startResend();
       const input = $('[data-code]', root);

@@ -655,5 +655,21 @@ export default {
   "err.media_too_large": "Faili hili ni kubwa mno (MB 5 zaidi).",
   "err.minor_world_private_only": "Chini ya miaka 18, akaunti yako ya World lazima iwe ya faragha.",
   "err.admins_only": "Wasimamizi pekee ndio wanaweza kutuma ujumbe.",
-  "err.confirmation_required": "Andika @jina lako la mtumiaji kuthibitisha."
+  "err.confirmation_required": "Andika @jina lako la mtumiaji kuthibitisha.",
+  "auth.passwordTitle": "Nenosiri lako",
+  "auth.passwordLead": "Weka nenosiri la akaunti {phone}.",
+  "auth.newPasswordTitle": "Chagua nenosiri",
+  "auth.newPasswordLead": "Pamoja na namba yako {phone}, litakuwezesha kuingia kwenye vifaa vyako vyote. Angalau herufi 8.",
+  "auth.password": "Nenosiri",
+  "auth.passwordConfirm": "Thibitisha nenosiri",
+  "err.wrong_password": "Namba au nenosiri si sahihi.",
+  "err.password_too_short": "Nenosiri lazima liwe na angalau herufi 8.",
+  "err.password_too_long": "Nenosiri ni refu mno.",
+  "err.password_mismatch": "Manenosiri mawili hayalingani.",
+  "err.phone_taken": "Akaunti tayari inatumia namba hii. Ingia badala yake.",
+  "err.too_many_logins": "Majaribio mengi mno. Jaribu tena baada ya dakika 15.",
+  "settings.password": "Badilisha nenosiri",
+  "settings.passwordCurrent": "Nenosiri lako la sasa:",
+  "settings.passwordNew": "Nenosiri jipya (angalau herufi 8). Vifaa vyako vingine vitaondolewa.",
+  "settings.passwordChanged": "Nenosiri limebadilishwa."
 };
