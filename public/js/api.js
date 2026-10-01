@@ -58,6 +58,9 @@ export async function api(method, url, body) {
   }
   if (!res.ok) {
     if (res.status === 401 && token) emit('logout', {});
+    // Sanctions (22.5) : compte banni → déconnexion ; suspendu → page de statut.
+    if (data?.error === 'account_banned') emit('banned', {});
+    if (data?.error === 'account_suspended') emit('suspended', {});
     throw new ApiError(data?.error || 'generic', res.status);
   }
   return data;

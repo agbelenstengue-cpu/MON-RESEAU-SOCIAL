@@ -1,7 +1,7 @@
 // Section 7.7 (onglet Me), 6 (relations), 15 (profils), 19 (notifications), 20 (paramètres).
 import { t, getLang, setLang, compact, relTime } from '../i18n.js';
 import { store, get, post, patch, put, del, readImage } from '../api.js';
-import { html, mount, $, $$, icon, avatar, toast, showError, dialog, actionSheet, reportFlow, empty, skeleton } from '../ui.js';
+import { html, mount, $, $$, icon, logo, avatar, toast, showError, dialog, actionSheet, reportFlow, empty, skeleton } from '../ui.js';
 import { layout, go, backButton, wireBack, signOut } from '../app.js';
 import { renderPosts } from './world.js';
 import { openViewer } from './stories.js';
@@ -74,6 +74,12 @@ export async function meScreen(root) {
               <div class="menu-group">
                 <a class="list-item" href="#/notifications">${icon('bell')}<span class="grow">${t('me.notifications')}</span></a>
                 <a class="list-item" href="#/settings">${icon('settings')}<span class="grow">${t('me.settings')}</span></a>
+              </div>
+              <div class="section-title">${t('safety.title')}</div>
+              <div class="menu-group">
+                <a class="list-item" href="#/account-status">${icon('info')}<span class="grow">${t('safety.status')}</span></a>
+                <a class="list-item" href="#/my-reports">${icon('flag')}<span class="grow">${t('safety.myReports')}</span></a>
+                ${store.me.role === 'moderator' ? html`<a class="list-item" href="#/moderation">${icon('lock')}<span class="grow">${t('mod.title')}</span></a>` : ''}
               </div>`}`
     );
     $$('[data-face]', main).forEach((b) =>
@@ -332,6 +338,8 @@ export async function notificationsScreen(root) {
   const target = (n) => {
     if (['like', 'comment', 'mention'].includes(n.type) && n.refId) return `#/post/${n.refId}`;
     if (n.type === 'friend_request' || n.type === 'follow_request') return '#/requests';
+    if (n.type === 'moderation_strike' || n.type.startsWith('appeal_')) return '#/account-status';
+    if (n.type === 'report_update') return '#/my-reports';
     return n.actor ? `#/u/${n.actor.username}` : '#/me';
   };
   mount(
@@ -339,7 +347,7 @@ export async function notificationsScreen(root) {
     items.length
       ? html`<ul class="list">${items.map(
           (n) => html`<li><a class="list-item" href="${target(n)}" style="${n.read ? '' : 'background:var(--accent-soft)'}">
-            ${avatar(n.actor, 'sm')}
+            ${n.actor ? avatar(n.actor, 'sm') : html`<span class="system-avatar" aria-label="MIC">${logo(24)}</span>`}
             <span class="grow" style="white-space:normal">${t(`notif.${n.type}`, { name: n.actor?.name || '' })}<span class="small muted" style="display:block">${relTime(n.createdAt)}</span></span>
           </a></li>`
         )}</ul>`

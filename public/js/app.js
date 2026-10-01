@@ -5,6 +5,7 @@ import { html, mount, icon, $, $$, toast } from './ui.js';
 import { welcomeScreen, authScreen } from './screens/auth.js';
 import { chatsScreen, chatScreen, newChatScreen, newGroupScreen, callsScreen } from './screens/chats.js';
 import { initCalls, hangUp } from './calls.js';
+import { myReportsScreen, accountStatusScreen, moderationScreen } from './screens/safety.js';
 import './voice.js';
 import { storiesScreen } from './screens/stories.js';
 import { createScreen } from './screens/create.js';
@@ -41,6 +42,10 @@ const ROUTES = [
   ['settings', settingsScreen],
   ['edit-profile', editProfileScreen],
   ['notifications', notificationsScreen],
+  ['my-reports', myReportsScreen],
+  ['account-status', accountStatusScreen],
+  ['moderation', moderationScreen],
+  ['moderation/:tab', moderationScreen],
 ];
 
 function match(path) {
@@ -184,6 +189,11 @@ export function signOut() {
 }
 
 on('logout', () => signOut());
+on('banned', () => {
+  toast(t('err.account_banned'));
+  signOut();
+});
+on('suspended', () => location.hash !== '#/account-status' && go('account-status'));
 initCalls();
 on('message', () => refreshBadges());
 on('receipts', () => refreshBadges());

@@ -236,7 +236,7 @@ export function actionSheet(items, { title, header } = {}) {
 }
 
 // Signalement (22.2).
-const REASONS = ['spam', 'harassment', 'hate', 'violence', 'nudity', 'minor_safety', 'scam', 'impersonation', 'false_info', 'other'];
+const REASONS = ['harassment', 'violence', 'nudity', 'scam', 'impersonation', 'hate', 'false_info', 'spam', 'minor_safety', 'self_harm', 'other'];
 export function reportFlow(targetType, targetId) {
   actionSheet(
     REASONS.map((r) => ({
@@ -250,7 +250,10 @@ export function reportFlow(targetType, targetId) {
         }
       },
     })),
-    { title: t('report.title'), header: html`<p class="muted small" style="margin:0 16px 8px">${t('report.lead')}</p>` }
+    {
+      title: t('report.title'),
+      header: html`<p class="muted small" style="margin:0 16px 8px">${t('report.lead')}${targetType === 'message' ? html`<br /><b>${t('report.messageNote')}</b>` : ''}</p>`,
+    }
   );
 }
 
