@@ -368,6 +368,25 @@ export default function chatRoutes(api, ctx) {
     res.status(201).json(views.message(q.msg.get(id), req.user.id, members));
   });
 
+  // Envoi individuel à un ami (listes de diffusion, 8.13) : la discussion directe
+  // est créée au besoin ; le message arrive comme un message privé ordinaire.
+  ctx.sendDirectMessage = (fromId, toId, { body = '', media = null, kind = 'text' }) => {
+    if (!social.isFriend(toId, fromId) || social.isBlockedEither(fromId, toId)) return null;
+    let convId = q.findDirect.get(fromId, toId)?.id;
+    if (!convId) {
+      convId = Number(q.insertConv.run('direct', null, fromId, now()).lastInsertRowid);
+      q.setTimer.run(social.privacy(fromId).defaultTimer, convId);
+      q.insertMember.run(convId, fromId, 'member', 'active', now());
+      q.insertMember.run(convId, toId, 'member', 'active', now());
+    }
+    const mid = Number(q.insertMsg.run(convId, fromId, kind, String(body).slice(0, MAX_BODY), media, null, null, now(), JSON.stringify({ broadcast: true })).lastInsertRowid);
+    ephemeral({ id: convId }, mid, false);
+    q.markRead.run(mid, mid, convId, fromId);
+    if (hub.isOnline(toId)) q.markDelivered.run(mid, convId, toId);
+    pushMessage(convId, mid);
+    return mid;
+  };
+
   // Passerelle World → Me (4.4) : partage d'une publication dans une discussion.
   ctx.sendPostToConversation = (userId, convId, postId, body = '') => {
     const { conv, me } = membership(convId, userId);
