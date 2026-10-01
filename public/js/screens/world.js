@@ -8,6 +8,43 @@ import { ensureWorld } from './create.js';
 const AUD_ICON = { everyone: '🌍', followers: '👥', friends: '🤝', only_me: '🔒' };
 
 // ---------------- Carte de publication ----------------
+function fmtDur(ms) {
+  const s = Math.round((ms || 0) / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+// Lecture automatique des clips visibles (muets par défaut, 14.9 et 26.3),
+// et une vue comptée après 2 secondes de lecture.
+const viewed = new Set();
+let clipObserver = null;
+export function watchClips(container) {
+  clipObserver ??= new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        const v = e.target;
+        if (e.isIntersecting && e.intersectionRatio >= 0.6) {
+          v.play().catch(() => {});
+          const id = Number(v.dataset.clipVideo);
+          if (!viewed.has(id)) {
+            clearTimeout(v._viewTimer);
+            v._viewTimer = setTimeout(() => {
+              if (!v.paused && !viewed.has(id)) {
+                viewed.add(id);
+                post(`/posts/${id}/view`).catch(() => {});
+              }
+            }, 2000);
+          }
+        } else {
+          v.pause();
+          clearTimeout(v._viewTimer);
+        }
+      }
+    },
+    { threshold: [0, 0.6] }
+  );
+  $$('video[data-clip-video]', container).forEach((v) => clipObserver.observe(v));
+}
+
 export function postCardHtml(p) {
   return html`<article class="post" data-post="${p.id}">
     <div class="post-head">
@@ -19,7 +56,15 @@ export function postCardHtml(p) {
       <button class="icon-btn" data-act="menu" aria-label="${t('common.more')}">${icon('more')}</button>
     </div>
     ${p.body ? html`<div class="post-body">${richText(p.body)}</div>` : ''}
-    ${p.media ? html`<div class="post-media" data-act="media"><img src="${p.media}" alt="" loading="lazy" /></div>` : ''}
+    ${p.kind === 'clip'
+      ? html`<div class="post-media clip-media" data-act="media">
+          <video data-clip-video="${p.id}" src="${p.video}" ${p.media ? raw(`poster="${p.media}"`) : ''} muted loop playsinline preload="metadata" ${p.allowDownload ? '' : raw('controlslist="nodownload"')}></video>
+          <span class="clip-badge">${icon('video', 'width="14" height="14"')} ${fmtDur(p.duration)} · ${t('clip.views', { count: compact(p.views || 0) })}</span>
+          <button class="clip-sound" data-act="sound" aria-label="${t('clip.sound')}">🔇</button>
+        </div>`
+      : p.media
+        ? html`<div class="post-media" data-act="media"><img src="${p.media}" alt="" loading="lazy" /></div>`
+        : ''}
     <div class="post-actions">
       <button data-act="like" class="${p.liked ? 'liked' : ''}" aria-pressed="${p.liked}" aria-label="${t('world.like')}">${icon('heart', p.liked ? 'fill="currentColor"' : '')}<span>${p.likes == null ? '' : compact(p.likes)}</span></button>
       <a href="#/post/${p.id}" class="btn-like" style="display:inline-flex;align-items:center;gap:6px;padding:6px 8px;color:var(--muted);font-size:13px" aria-label="${t('world.comment')}">${icon('comment', 'width="20" height="20"')}<span>${compact(p.comments)}</span></a>
@@ -38,8 +83,11 @@ export function wirePosts(container, posts, { onRemove } = {}) {
     if (!old) return;
     const tmp = document.createElement('div');
     mount(tmp, postCardHtml(p));
-    old.replaceWith(tmp.firstElementChild);
+    const fresh = tmp.firstElementChild;
+    old.replaceWith(fresh);
+    watchClips(fresh);
   };
+  watchClips(container);
   const like = async (p, burstEl) => {
     try {
       const fresh = p.liked ? await del(`/posts/${p.id}/like`) : await post(`/posts/${p.id}/like`);
@@ -70,6 +118,14 @@ export function wirePosts(container, posts, { onRemove } = {}) {
       }
     }
     if (act === 'share') shareSheet(p);
+    if (act === 'sound') {
+      const v = btn.closest('.clip-media')?.querySelector('video');
+      if (v) {
+        v.muted = !v.muted;
+        btn.textContent = v.muted ? '🔇' : '🔊';
+        if (v.paused) v.play().catch(() => {});
+      }
+    }
     if (act === 'menu') postMenu(p, { redraw, remove: () => (container.querySelector(`[data-post="${p.id}"]`)?.remove(), onRemove?.(p)) });
   });
   // Double appui sur la photo = j'aime, avec l'animation du sourire MIC (16.1).
@@ -156,6 +212,19 @@ function whySheet(p) {
 
 function postMenu(p, { redraw, remove }) {
   const items = [{ label: t('world.why'), icon: 'info', run: () => whySheet(p) }];
+  // « Allow download » (14.4) : proposé seulement si l'auteur l'autorise.
+  if (p.kind === 'clip' && (p.allowDownload || p.mine)) {
+    items.push({
+      label: t('clip.download'),
+      icon: 'archive',
+      run: () => {
+        const a = document.createElement('a');
+        a.href = p.video;
+        a.download = `mic-clip-${p.id}`;
+        a.click();
+      },
+    });
+  }
   if (p.mine) {
     items.push({ label: t('world.editPost'), icon: 'edit', run: () => editPost(p, redraw) });
     items.push({
@@ -249,6 +318,7 @@ export async function worldScreen(root, { feed } = {}) {
     html`<div class="chips" role="tablist">
         <a class="chip ${feed === 'for-you' ? 'active' : ''}" href="#/world/for-you">${t('world.forYou')}</a>
         <a class="chip ${feed === 'following' ? 'active' : ''}" href="#/world/following">${t('world.following')}</a>
+        <a class="chip" href="#/clips">${icon('video', 'width="14" height="14" style="vertical-align:-2px"')} ${t('clip.feed')}</a>
       </div>
       ${!store.me.world.enabled
         ? html`<div class="world-cta"><h3>${t('me.activateWorld')}</h3><p class="small muted">${t('me.activateWorldLead')}</p><button class="btn world" data-join>${t('me.activateWorld')}</button></div>`
@@ -406,4 +476,101 @@ export async function searchScreen(root) {
 
   $('[data-q]', main).addEventListener('input', (e) => search(e.target.value.trim()));
   await showDefault();
+}
+
+// ---------------- Fil Clips plein écran vertical (14.2) ----------------
+export async function clipsScreen(root) {
+  layout(root, { universe: 'world', topbar: false, tab: 'world', flush: true });
+  const main = $('main', root);
+  mount(main, html`<div class="clips-feed" data-feed>${skeleton(1)}</div>`);
+  const feed = $('[data-feed]', main);
+  let clips = [];
+  try {
+    clips = await get('/feed/clips');
+  } catch (err) {
+    showError(err);
+  }
+  let muted = true;
+  const item = (p) => html`<section class="clip-item" data-post="${p.id}">
+    <video data-clip-video="${p.id}" src="${p.video}" ${p.media ? raw(`poster="${p.media}"`) : ''} loop playsinline preload="metadata" ${muted ? raw('muted') : ''} ${p.allowDownload ? '' : raw('controlslist="nodownload"')}></video>
+    <div class="clip-side">
+      <a href="#/u/${p.author.username}" class="clip-author">${avatar(p.author, 'sm')}</a>
+      <button data-act="like" class="${p.liked ? 'liked' : ''}" aria-label="${t('world.like')}">${icon('heart', p.liked ? 'fill="currentColor"' : '')}<span>${p.likes == null ? '' : compact(p.likes)}</span></button>
+      <a href="#/post/${p.id}" aria-label="${t('world.comment')}">${icon('comment')}<span>${compact(p.comments)}</span></a>
+      <button data-act="share" aria-label="${t('world.share')}">${icon('share')}<span>${p.shares ? compact(p.shares) : ''}</span></button>
+      <button data-act="save" class="${p.saved ? 'on' : ''}" aria-label="${t('world.save')}">${icon('bookmark', p.saved ? 'fill="currentColor"' : '')}</button>
+      <button data-act="menu" aria-label="${t('common.more')}">${icon('more')}</button>
+    </div>
+    <div class="clip-caption">
+      <a href="#/u/${p.author.username}"><b>@${p.author.username}</b></a>
+      ${p.body ? html`<div class="clip-text">${richText(p.body)}</div>` : ''}
+      <div class="small" style="opacity:.8">${t('clip.views', { count: compact(p.views || 0) })} · ${relTime(p.createdAt)}</div>
+    </div>
+    <button class="clip-mute" data-mute aria-label="${t('clip.sound')}">${muted ? '🔇' : '🔊'}</button>
+  </section>`;
+  const draw = () => {
+    mount(
+      feed,
+      clips.length
+        ? html`${clips.map(item)}`
+        : html`<div class="clip-empty">${empty(t('clip.empty'), t('clip.emptyLead'), html`<a class="btn world" href="#/create/clip">${t('clip.create')}</a>`)}</div>`
+    );
+    watchClips(feed);
+  };
+  draw();
+  // Actions (j'aime, partage, enregistrer, menu) partagées avec les cartes.
+  const sync = (p) => {
+    const old = feed.querySelector(`[data-post="${p.id}"] .clip-side`);
+    if (!old) return;
+    const tmp = document.createElement('div');
+    mount(tmp, item(p));
+    old.replaceWith(tmp.querySelector('.clip-side'));
+  };
+  feed.addEventListener('click', async (e) => {
+    const sec = e.target.closest('[data-post]');
+    if (!sec) return;
+    const p = clips.find((c) => c.id === Number(sec.dataset.post));
+    const btn = e.target.closest('[data-act]');
+    if (e.target.closest('[data-mute]')) {
+      muted = !muted;
+      $$('video', feed).forEach((v) => (v.muted = muted));
+      $$('[data-mute]', feed).forEach((b) => (b.textContent = muted ? '🔇' : '🔊'));
+      return;
+    }
+    if (!btn) {
+      // Appui = pause / lecture (14.2).
+      if (e.target.closest('a')) return;
+      const v = $('video', sec);
+      if (v.paused) v.play().catch(() => {});
+      else v.pause();
+      return;
+    }
+    const act = btn.dataset.act;
+    try {
+      if (act === 'like') Object.assign(p, p.liked ? await del(`/posts/${p.id}/like`) : await post(`/posts/${p.id}/like`));
+      if (act === 'save') {
+        if (p.saved) {
+          await del(`/posts/${p.id}/save`);
+          p.saved = false;
+        } else Object.assign(p, await post(`/posts/${p.id}/save`));
+      }
+      if (act === 'share') return shareSheet(p);
+      if (act === 'menu') return postMenu(p, { redraw: sync, remove: () => sec.remove() });
+      sync(p);
+    } catch (err) {
+      showError(err);
+    }
+  });
+  // Double appui = j'aime avec le sourire MIC.
+  feed.addEventListener('dblclick', async (e) => {
+    const sec = e.target.closest('[data-post]');
+    if (!sec || e.target.closest('.clip-side')) return;
+    const p = clips.find((c) => c.id === Number(sec.dataset.post));
+    burst(sec);
+    if (!p.liked) {
+      Object.assign(p, await post(`/posts/${p.id}/like`).catch(() => p));
+      sync(p);
+    }
+  });
+  return () => $$('video', feed).forEach((v) => v.pause());
 }

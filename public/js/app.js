@@ -8,7 +8,7 @@ import { initCalls, hangUp } from './calls.js';
 import './voice.js';
 import { storiesScreen } from './screens/stories.js';
 import { createScreen } from './screens/create.js';
-import { worldScreen, postScreen, tagScreen, searchScreen } from './screens/world.js';
+import { worldScreen, postScreen, tagScreen, searchScreen, clipsScreen } from './screens/world.js';
 import { meScreen, profileScreen, requestsScreen, friendsScreen, savedScreen, archiveScreen, settingsScreen, editProfileScreen, notificationsScreen } from './screens/me.js';
 
 const app = document.getElementById('app');
@@ -28,6 +28,7 @@ const ROUTES = [
   ['create/:mode', createScreen],
   ['world', worldScreen],
   ['world/:feed', worldScreen],
+  ['clips', clipsScreen],
   ['post/:id', postScreen],
   ['tag/:tag', tagScreen],
   ['search', searchScreen],

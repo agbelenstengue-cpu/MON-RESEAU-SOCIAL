@@ -65,13 +65,16 @@ Le micro et la caméra ne fonctionnent dans le navigateur qu'en **HTTPS** ou sur
 | 8. Messagerie | Discussions individuelles et groupes, temps réel (WebSocket), statuts envoyé / distribué / lu, « écrit… », en ligne / vu à (amis seulement), réponses citées, réactions (une par personne), modification 15 min, suppression pour tous 48 h, photos, demandes de message pour les inconnus (sans accusé de lecture), mineurs non joignables par des inconnus |
 | 9. Messages vocaux | Maintenir le micro pour enregistrer, glisser à gauche pour annuler, glisser vers le haut ou simple appui pour verrouiller (« Tap to record »), pause / reprise, écoute avant envoi, onde sonore, lecture 1× · 1,5× · 2×, avance en touchant l'onde, lecture continue des vocaux non écoutés, mini-lecteur flottant, statut « écouté » (point vert / micro vert), indicateur « enregistre un vocal… », Opus ~32 kbit/s, 60 min max. |
 | 10. Appels | Appels vocaux et vidéo individuels et de groupe (32 max.) en WebRTC pair-à-pair, sonnerie, Accepter / Refuser / Répondre par message, occupé, sans réponse après 40 s, bandeau « Rejoindre » pour un appel de groupe en cours, micro / caméra / changer de caméra / passer de l'audio à la vidéo, réactions qui flottent, réduction en pastille pour continuer à naviguer, message « Appel manqué · Rappeler » dans la discussion, historique (Toutes / Manqués, suppression), appels réservés aux amis (10.8) et impossibles avec un compte bloqué |
+| 8.8 / 8.9 Éphémères et vue unique | Minuteur par discussion (désactivé, 24 h, 7 j, 90 j) avec message système, minuteur par défaut, effacement automatique côté serveur ; photo ou vocal en vue unique ouvert une seule fois en plein écran, fichier supprimé ensuite, statut « Ouvert » |
 | 11. Groupes | Création avec ses amis, admins, mode annonce, ajout / retrait, quitter |
 | 12. Stories | Audiences Amis / Proches / Moi uniquement / World, 24 h, lecteur plein écran (appui = pause), liste des vues, archives |
 | 13. Caméra | Prise de vue (getUserMedia) ou galerie, 6 filtres MIC, stories texte sur fonds de la marque |
 | 14. World | Publications texte + photo, réglages par publication (qui peut voir, qui peut commenter, masquer les j'aime), modification, suppression, partage vers une discussion (passerelle World → Me) |
+| 14.2 Clips | Enregistrement vidéo depuis la caméra MIC (3 min) ou import (10 min, 50 Mo), couverture automatique, publication avec réglages (dont « Autoriser le téléchargement », désactivé par défaut pour les mineurs), fil vertical plein écran (appui = pause, double appui = j'aime, son activable), lecture automatique silencieuse dans les fils, compteur de vues |
 | 16. Interactions | J'aime (double-clic avec l'animation du sourire), commentaires, mentions, enregistrements, « Pas intéressé » |
 | 17. Découverte | Recherche (personnes, hashtags, publications), pages hashtag, tendances, fil *For You* explicable (« Pourquoi je vois ce contenu ? ») |
 | 19. Notifications | J'aime, commentaires, mentions, demandes d'ami et d'abonnement |
+| 20.2 Confidentialité | Vu à et en ligne, photo de profil privée, statut, qui peut m'écrire / m'appeler / me mentionner, minuteur par défaut, accusés de lecture et indicateur d'écriture (réciproques), suggestion du compte ; valeurs plus strictes et verrouillées pour les mineurs |
 | 22. Sécurité | Blocage (effets de la section 22.4), signalement avec motifs |
 
 ## Ce qui reste à faire (et pourquoi)
@@ -88,8 +91,10 @@ personnes (section 28.3). Ce prototype valide le produit ; il ne remplace pas :
   le partage d'écran et les effets en direct.
 - Pour les vocaux : transcription, coupe du début / de la fin avant envoi, vocaux en vue unique,
   brouillon vocal conservé quand on quitte la discussion.
-- Vidéo courte (Clips), Live, MIC Effects Studio, communautés, événements, canaux.
-- Messages éphémères, vue unique, sauvegarde chiffrée, appareils liés.
+- Live, MIC Effects Studio, communautés, événements, canaux ; pour les Clips : montage, sons,
+  duo / remix, transcodage serveur (les vidéos sont servies telles qu'envoyées).
+- Alerte de capture d'écran (impossible à détecter dans un navigateur), sauvegarde chiffrée,
+  appareils liés, verrouillage de discussion.
 - Modération outillée, Family Center, vérification de l'âge, conformité par pays (sections 22 à 24).
 - Applications mobiles natives et architecture distribuée (section 27).
 

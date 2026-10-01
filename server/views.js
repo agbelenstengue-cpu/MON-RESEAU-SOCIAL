@@ -1,3 +1,4 @@
+import { isMinor } from './privacy.js';
 // Mise en forme des objets renvoyés au client.
 // Principe 4.3 : « une personne, deux visages » — un ami voit le nom et la photo
 // privés, le public voit le nom et la photo World.
@@ -63,6 +64,7 @@ export function makeViews(db, social, hub) {
           bio: u.bio,
         },
         firstPublicDone: !!u.first_public_done,
+        isMinor: isMinor(u),
         createdAt: u.created_at,
       };
     },

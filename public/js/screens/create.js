@@ -1,6 +1,6 @@
 // Section 13 (caméra MIC, filtres) et 4.5 (sélecteur d'audience).
 import { t } from '../i18n.js';
-import { store, get, post, patch, readImage } from '../api.js';
+import { store, get, post, patch, readImage, uploadVideo } from '../api.js';
 import { html, mount, $, $$, icon, avatar, sheet, dialog, toast, showError, errorText } from '../ui.js';
 import { layout, go } from '../app.js';
 
@@ -16,10 +16,15 @@ const FILTERS = {
 const BACKGROUNDS = ['espresso', 'cognac', 'emerald', 'sage', 'brass', 'ebony'];
 
 export async function createScreen(root, { mode = 'photo' } = {}) {
-  const state = { mode: mode === 'text' ? 'text' : 'photo', facing: 'environment', source: null, filter: 'none', caption: '', text: '', bg: 'espresso' };
+  const state = { mode: ['text', 'clip'].includes(mode) ? mode : 'photo', clip: null, recording: null, facing: 'environment', source: null, filter: 'none', caption: '', text: '', bg: 'espresso' };
   let stream = null;
 
   const stopStream = () => {
+    if (state.recording) {
+      clearInterval(state.recording.timer);
+      if (state.recording.rec.state !== 'inactive') state.recording.rec.stop();
+      state.recording = null;
+    }
     stream?.getTracks().forEach((tr) => tr.stop());
     stream = null;
   };
@@ -36,10 +41,13 @@ export async function createScreen(root, { mode = 'photo' } = {}) {
     stopStream();
     const modes = html`<div class="modes" role="tablist">
       <button data-mode="photo" class="${state.mode === 'photo' ? 'active' : ''}">${t('camera.photo')}</button>
+      <button data-mode="clip" class="${state.mode === 'clip' ? 'active' : ''}">${t('clip.mode')}</button>
       <button data-mode="text" class="${state.mode === 'text' ? 'active' : ''}">${t('camera.text')}</button>
     </div>`;
 
-    if (state.mode === 'text') {
+    if (state.mode === 'clip') {
+      await drawClip(modes);
+    } else if (state.mode === 'text') {
       mount(
         main,
         html`<div class="camera">
@@ -153,8 +161,146 @@ export async function createScreen(root, { mode = 'photo' } = {}) {
     );
   };
 
+  // ---------- Mode Clip (13.2, 14.2) : enregistrement jusqu'à 3 min ou import ----------
+  const CLIP_MAX_REC = 3 * 60 * 1000;
+  const drawClip = async (modes) => {
+    if (state.clip) {
+      mount(
+        main,
+        html`<div class="camera">
+          <div class="viewport"><video class="preview-img" data-clip src="${state.clip.url}" autoplay loop playsinline></video></div>
+          <p class="center small" style="opacity:.8">${fmtClip(state.clip.duration)}</p>
+          <div class="caption-bar"><textarea class="input" data-caption maxlength="2200" placeholder="${t('camera.caption')}">${state.caption}</textarea></div>
+          <div class="shutter-row">
+            <button class="btn ghost" data-retake style="color:#fff;border-color:rgba(255,255,255,.3)">${t('camera.retake')}</button>
+            <button class="btn" data-next style="background:var(--brass);color:#1c1a19;min-width:140px">${t('camera.next')}</button>
+          </div>
+        </div>`
+      );
+      $('[data-caption]', main).addEventListener('input', (e) => (state.caption = e.target.value));
+      $('[data-retake]', main).addEventListener('click', () => {
+        URL.revokeObjectURL(state.clip.url);
+        state.clip = null;
+        draw();
+      });
+      $('[data-next]', main).addEventListener('click', async () => {
+        if (state.clip.duration < 1000) return toast(t('clip.tooShort'));
+        const cover = await captureCover($('[data-clip]', main));
+        openAudience({ kind: 'video', blob: state.clip.blob, duration: state.clip.duration, media: cover, body: state.caption.trim() });
+      });
+      return;
+    }
+    mount(
+      main,
+      html`<div class="camera">
+        ${modes}
+        <div class="viewport"><video data-video autoplay playsinline muted></video><p data-nocam class="center" style="padding:24px;opacity:.8" hidden>${t('camera.noCamera')}</p>
+          <span class="clip-timer" data-ctime hidden>0:00 / 3:00</span></div>
+        <div class="shutter-row">
+          <label class="icon-btn" aria-label="${t('camera.gallery')}">${icon('image')}<input type="file" accept="video/mp4,video/webm,video/quicktime" data-vfile hidden /></label>
+          <button class="shutter clip" data-rec aria-label="${t('clip.record')}"></button>
+          <button class="icon-btn" data-flip aria-label="${t('camera.flip')}">${icon('flip')}</button>
+        </div>
+      </div>`
+    );
+    const video = $('[data-video]', main);
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('no camera');
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.facing, width: { ideal: 720 }, height: { ideal: 1280 } }, audio: true });
+      if (!main.isConnected) return stopStream();
+      video.srcObject = stream;
+    } catch {
+      video.hidden = true;
+      $('[data-nocam]', main).hidden = false;
+      $('[data-rec]', main).disabled = true;
+    }
+    $('[data-flip]', main).addEventListener('click', () => {
+      if (state.recording) return;
+      state.facing = state.facing === 'environment' ? 'user' : 'environment';
+      draw();
+    });
+    $('[data-rec]', main).addEventListener('click', (e) => {
+      if (state.recording) return finishRecording();
+      const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find((m) => MediaRecorder.isTypeSupported(m)) || '';
+      const rec = new MediaRecorder(stream, { ...(mime ? { mimeType: mime } : {}), videoBitsPerSecond: 2_500_000 });
+      const chunks = [];
+      rec.ondataavailable = (ev) => ev.data.size && chunks.push(ev.data);
+      const startedAt = performance.now();
+      rec.onstop = () => {
+        const duration = Math.round(performance.now() - startedAt);
+        const blob = new Blob(chunks, { type: (rec.mimeType || 'video/webm').split(';')[0] });
+        stopStream();
+        state.clip = { blob, url: URL.createObjectURL(blob), duration };
+        draw();
+      };
+      rec.start(500);
+      const ctime = $('[data-ctime]', main);
+      ctime.hidden = false;
+      const timer = setInterval(() => {
+        const d = performance.now() - startedAt;
+        ctime.textContent = `${fmtClip(d)} / 3:00`;
+        if (d >= CLIP_MAX_REC) finishRecording();
+      }, 250);
+      state.recording = { rec, timer };
+      e.currentTarget.classList.add('recording');
+    });
+    const finishRecording = () => {
+      const r = state.recording;
+      if (!r) return;
+      clearInterval(r.timer);
+      state.recording = null;
+      if (r.rec.state !== 'inactive') r.rec.stop();
+    };
+    $('[data-vfile]', main).addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (file.size > 50 * 1024 * 1024) return toast(t('err.media_too_large_video'));
+      const url = URL.createObjectURL(file);
+      const duration = await new Promise((resolve) => {
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.onloadedmetadata = () => resolve(Math.round(v.duration * 1000));
+        v.onerror = () => resolve(0);
+        v.src = url;
+      });
+      if (!duration) return toast(t('err.invalid_media'));
+      if (duration > 10 * 60 * 1000) return toast(t('clip.tooLong'));
+      stopStream();
+      state.clip = { blob: file, url, duration };
+      draw();
+    });
+  };
+
   await draw();
-  return stopStream;
+  return () => {
+    stopStream();
+    if (state.clip) URL.revokeObjectURL(state.clip.url);
+  };
+}
+
+function fmtClip(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+// Couverture du clip : une image tirée de la vidéo.
+function captureCover(video) {
+  return new Promise((resolve) => {
+    const grab = () => {
+      try {
+        const c = document.createElement('canvas');
+        const scale = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight));
+        c.width = Math.round(video.videoWidth * scale);
+        c.height = Math.round(video.videoHeight * scale);
+        c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+        resolve(c.width ? c.toDataURL('image/jpeg', 0.8) : undefined);
+      } catch {
+        resolve(undefined);
+      }
+    };
+    if (video.readyState >= 2 && video.videoWidth) grab();
+    else video.addEventListener('loadeddata', grab, { once: true });
+  });
 }
 
 function applyFilter(src, filter) {
@@ -191,7 +337,9 @@ export async function openAudience(content, { onDone } = {}) {
   // Les destinations privées sont pré-cochées selon le dernier choix ; jamais les publiques.
   const sel = new Set(lastPrivate());
   const chats = new Set();
-  const settings = { audience: 'everyone', whoCanComment: 'everyone', hideLikes: false };
+  const isVideo = content.kind === 'video';
+  const settings = { audience: 'everyone', whoCanComment: 'everyone', hideLikes: false, ...(isVideo ? { allowDownload: !store.me.isMinor } : {}) };
+  if (isVideo) sel.clear(); // un clip se publie dans World uniquement
   let showChats = false;
 
   sheet((box, close) => {
@@ -209,7 +357,8 @@ export async function openAudience(content, { onDone } = {}) {
           <h2>${t('share.title')}</h2>
           <div class="aud-block private">
             <div class="aud-title">${icon('lock', 'width="12" height="12" style="vertical-align:-1px"')} ${t('share.private')} · Me</div>
-            ${opt('only_me', t('share.onlyMe'), t('share.onlyMeDesc'))}
+            ${isVideo ? html`<p class="small muted" style="margin:0 16px 8px">${t('clip.privateNote')}</p>` : ''}
+            ${isVideo ? '' : html`${opt('only_me', t('share.onlyMe'), t('share.onlyMeDesc'))}
             ${opt('story_friends', t('share.storyFriends'))}
             ${opt('story_close', t('share.storyClose'))}
             <label class="aud-option"><input type="checkbox" data-sendto ${showChats || chats.size ? 'checked' : ''} /><span class="grow">${t('share.sendTo')}<small>${chats.size ? `${chats.size} ✓` : t('share.sendToDesc')}</small></span></label>
@@ -219,17 +368,18 @@ export async function openAudience(content, { onDone } = {}) {
                       (c) => html`<label class="list-item">${c.type === 'direct' ? avatar(c.peer, 'xs') : avatar({ name: c.title }, 'xs')}<span class="grow title">${c.type === 'direct' ? c.peer?.name : c.title}</span><input type="checkbox" data-chat="${c.id}" ${chats.has(c.id) ? 'checked' : ''} /></label>`
                     )
                   : html`<p class="muted small center">${t('share.noChats')}</p>`}</div>`
-              : ''}
+              : ''}`}
           </div>
           <div class="aud-block public">
             <div class="aud-title">${icon('world', 'width="12" height="12" style="vertical-align:-1px"')} ${t('share.publicBlock')} · World</div>
-            ${opt('post_world', t('share.postWorld'))}
-            ${opt('world_story', t('share.worldStory'))}
+            ${opt('post_world', isVideo ? t('share.postClip') : t('share.postWorld'))}
+            ${isVideo ? '' : opt('world_story', t('share.worldStory'))}
             ${sel.has('post_world')
               ? html`<div class="post-settings">
                   <div class="row"><label>${t('share.whoView')}</label>${select('audience', ['everyone', 'followers', 'friends', 'only_me'], settings.audience)}</div>
                   <div class="row"><label>${t('share.whoComment')}</label>${select('whoCanComment', ['everyone', 'followers', 'friends', 'nobody'], settings.whoCanComment)}</div>
                   <label class="row"><span class="grow">${t('share.hideLikes')}</span><input type="checkbox" class="toggle" data-hidelikes ${settings.hideLikes ? 'checked' : ''} /></label>
+                  ${isVideo ? html`<label class="row"><span class="grow">${t('share.allowDownload')}</span><input type="checkbox" class="toggle" data-allowdl ${settings.allowDownload ? 'checked' : ''} /></label>` : ''}
                 </div>`
               : ''}
           </div>
@@ -245,7 +395,8 @@ export async function openAudience(content, { onDone } = {}) {
           draw();
         })
       );
-      $('[data-sendto]', box).addEventListener('change', (e) => {
+      $('[data-allowdl]', box)?.addEventListener('change', (e) => (settings.allowDownload = e.target.checked));
+      $('[data-sendto]', box)?.addEventListener('change', (e) => {
         showChats = e.target.checked;
         if (!showChats) chats.clear();
         draw();
@@ -292,7 +443,15 @@ export async function openAudience(content, { onDone } = {}) {
       if (sel.has('story_friends')) jobs.push(story('friends'));
       if (sel.has('story_close')) jobs.push(story('close_friends'));
       if (sel.has('world_story')) jobs.push(story('world'));
-      if (sel.has('post_world')) jobs.push(post('/posts', { body: content.body, media: content.kind === 'image' ? content.media : undefined, ...settings }));
+      if (sel.has('post_world') && isVideo) {
+        // La vidéo part d'abord en binaire, puis la publication la référence.
+        toast(t('clip.uploading'));
+        jobs.push(
+          uploadVideo(content.blob).then(({ url }) =>
+            post('/posts', { body: content.body, media: content.media, video: url, duration: content.duration, ...settings })
+          )
+        );
+      } else if (sel.has('post_world')) jobs.push(post('/posts', { body: content.body, media: content.kind === 'image' ? content.media : undefined, ...settings }));
       for (const id of chats) {
         jobs.push(
           post(`/conversations/${id}/messages`, content.kind === 'image' ? { kind: 'image', media: content.media, body: content.body } : { body: content.body })
@@ -305,6 +464,10 @@ export async function openAudience(content, { onDone } = {}) {
         if (results.every((r) => r.status === 'rejected')) return false;
       } else toast(t('share.done'));
       if (onDone) onDone();
+      else if (isPublic && isVideo) {
+        const clip = results.find((r) => r.status === 'fulfilled' && r.value?.kind === 'clip')?.value;
+        go(clip ? `post/${clip.id}` : 'world');
+      }
       else if (isPublic) go('world/following');
       else if (chats.size === 1 && sel.size === 0) go(`chat/${[...chats][0]}`);
       else if (chats.size && sel.size === 0) go('chats');

@@ -121,6 +121,20 @@ export function sendWs(type, data) {
   if (ws?.readyState === 1) ws.send(JSON.stringify({ type, ...data }));
 }
 
+// Envoi binaire d'une vidéo de clip (trop lourde pour du JSON).
+export async function uploadVideo(blob) {
+  const type = (blob.type || 'video/webm').split(';')[0];
+  let res;
+  try {
+    res = await fetch('/api/media/video', { method: 'POST', headers: { 'content-type': type, authorization: `Bearer ${token}` }, body: blob });
+  } catch {
+    throw new ApiError('network', 0);
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(data?.error || 'generic', res.status);
+  return data;
+}
+
 // Lecture d'un fichier image en data URL, redimensionnée pour économiser
 // les données (26.3).
 export function readImage(file, max = 1600) {
