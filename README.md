@@ -27,11 +27,14 @@ Comptes de démonstration (après `npm run seed`) — choisissez « Se connecter
 
 | Numéro | Compte |
 | --- | --- |
-| +237 670000001 | @angele — Angèle Nkoa (World actif) |
+| +237 670000001 | @angele — Angèle Nkoa (World actif, **modératrice**) |
 | +237 670000002 | @paul — Paul Mbarga |
 | +237 670000003 | @sophie — Sophie Ekane (Me uniquement) |
 | +237 670000004 | @kofi — Kofi Mensah (créateur) |
-| +33 600000005 | @lea — Léa Martin |
+| +33 600000005 | @lea — Léa Martin (choisir la France comme pays) |
+
+La démo contient aussi un canal (« MIC Officiel »), une communauté (« Cuisine
+camerounaise ») avec un événement, des discussions, des stories et des publications.
 
 Aucun SMS n'est envoyé : en développement, **le code de vérification s'affiche
 à l'écran** (et dans le terminal). Ouvrez deux navigateurs (ou une fenêtre
@@ -57,46 +60,46 @@ Le micro et la caméra ne fonctionnent dans le navigateur qu'en **HTTPS** ou sur
 | Section du cahier | Implémenté |
 | --- | --- |
 | 2. Identité « luxe » | Palette Espresso / Cognac / Émeraude / Sauge / Laiton / Ivoire / Ébène, serif pour les titres, logo « sourire » en une ligne, liseré d'univers, mode sombre, animations courtes, squelettes de chargement, états vides |
-| 3. Langues | Anglais par défaut, français ; bascule instantanée ; dates et compteurs localisés (1,2 k) |
+| 3. Langues | Les six langues de lancement : anglais (par défaut), français, espagnol, portugais, arabe (interface en miroir, de droite à gauche) et swahili ; langue du navigateur détectée, bascule instantanée, fichiers de langue téléchargés à la demande ; dates, heures et compteurs localisés (1,2 k), fuseau horaire des événements |
 | 4. Me / World | Deux visages (nom et photo privés pour les amis, publics pour les autres), présence World facultative, sélecteur d'audience avec blocs Privé / Public, bouton *Send* (marron) ou *Publish* (vert), confirmation de la première publication publique, dernier choix privé mémorisé (jamais le public) |
 | 5. Compte | Inscription par numéro + code à 6 chiffres (expiration 10 min, 5 codes/heure, 5 essais), date de naissance (âge minimum 13 ans, mineurs en privé), @username avec suggestions, choix « Rester en privé » / « Rejoindre World », déconnexion, suppression du compte |
 | 6. Graphe social | Amis (demandes, acceptation, refus silencieux), proches (liste privée), abonnés (compte World public ou privé avec approbation), personnes que vous pourriez connaître |
-| 7. Navigation | 5 onglets : Chats · Stories · Caméra · World · Me ; bandeau hors ligne |
+| 7. Navigation | 5 onglets : Chats · Stories · Caméra · World · Me ; bandeau hors ligne ; menu Nouveau (discussion, groupe, liste de diffusion, canal) |
 | 8. Messagerie | Discussions individuelles et groupes, temps réel (WebSocket), statuts envoyé / distribué / lu, « écrit… », en ligne / vu à (amis seulement), réponses citées, réactions (une par personne), modification 15 min, suppression pour tous 48 h, photos, demandes de message pour les inconnus (sans accusé de lecture), mineurs non joignables par des inconnus |
 | 9. Messages vocaux | Maintenir le micro pour enregistrer, glisser à gauche pour annuler, glisser vers le haut ou simple appui pour verrouiller (« Tap to record »), pause / reprise, écoute avant envoi, onde sonore, lecture 1× · 1,5× · 2×, avance en touchant l'onde, lecture continue des vocaux non écoutés, mini-lecteur flottant, statut « écouté » (point vert / micro vert), indicateur « enregistre un vocal… », Opus ~32 kbit/s, 60 min max. |
 | 10. Appels | Appels vocaux et vidéo individuels et de groupe (32 max.) en WebRTC pair-à-pair, sonnerie, Accepter / Refuser / Répondre par message, occupé, sans réponse après 40 s, bandeau « Rejoindre » pour un appel de groupe en cours, micro / caméra / changer de caméra / passer de l'audio à la vidéo, réactions qui flottent, réduction en pastille pour continuer à naviguer, message « Appel manqué · Rappeler » dans la discussion, historique (Toutes / Manqués, suppression), appels réservés aux amis (10.8) et impossibles avec un compte bloqué |
 | 8.8 / 8.9 Éphémères et vue unique | Minuteur par discussion (désactivé, 24 h, 7 j, 90 j) avec message système, minuteur par défaut, effacement automatique côté serveur ; photo ou vocal en vue unique ouvert une seule fois en plein écran, fichier supprimé ensuite, statut « Ouvert » |
-| 11. Groupes | Création avec ses amis, admins, mode annonce, ajout / retrait, quitter |
+| 11. Groupes, canaux, diffusion | Groupes (admins, mode annonce, ajout / retrait) ; **canaux** World publics ou privés sur invitation, 16 admins, réactions, vues, abonnés invisibles entre eux ; **listes de diffusion** (256 amis, réponses en privé) |
 | 12. Stories | Audiences Amis / Proches / Moi uniquement / World, 24 h, lecteur plein écran (appui = pause), liste des vues, archives |
 | 13. Caméra | Prise de vue (getUserMedia) ou galerie, 6 filtres MIC, stories texte sur fonds de la marque |
 | 14. World | Publications texte + photo, réglages par publication (qui peut voir, qui peut commenter, masquer les j'aime), modification, suppression, partage vers une discussion (passerelle World → Me) |
 | 14.2 Clips | Enregistrement vidéo depuis la caméra MIC (3 min) ou import (10 min, 50 Mo), couverture automatique, publication avec réglages (dont « Autoriser le téléchargement », désactivé par défaut pour les mineurs), fil vertical plein écran (appui = pause, double appui = j'aime, son activable), lecture automatique silencieuse dans les fils, compteur de vues |
 | 16. Interactions | J'aime (double-clic avec l'animation du sourire), commentaires, mentions, enregistrements, « Pas intéressé » |
 | 17. Découverte | Recherche (personnes, hashtags, publications), pages hashtag, tendances, fil *For You* explicable (« Pourquoi je vois ce contenu ? ») |
-| 19. Notifications | J'aime, commentaires, mentions, demandes d'ami et d'abonnement |
+| 18. Communautés et événements | Communautés publiques, privées (sur demande) ou cachées (sur invitation), rôles propriétaire / admin / modérateur / membre, règles, épinglage, retrait de publications, journal de modération, fil « Communautés » ; événements (visibilité, J'y vais / Intéressé / Je ne peux pas, adresse réservée aux participants confirmés, rappels 1 jour et 1 heure avant, annulation notifiée, export vers l'agenda) |
+| 19. Notifications | J'aime, commentaires, mentions, demandes, communautés, événements, modération |
 | 20.2 Confidentialité | Vu à et en ligne, photo de profil privée, statut, qui peut m'écrire / m'appeler / me mentionner, minuteur par défaut, accusés de lecture et indicateur d'écriture (réciproques), suggestion du compte ; valeurs plus strictes et verrouillées pour les mineurs |
-| 22. Sécurité | Blocage (effets de la section 22.4), signalement avec motifs |
+| 22. Modération | Blocage (22.4) ; signalement limité à ce que l'on voit (message transmis avec 5 précédents) ; **console de modération** triée par gravité, images floutées ; décisions et **avertissements** (restriction 24 h / 7 j, suspension 30 j, bannissement) ; **appels** revus par un autre modérateur ; pages « Statut du compte » et « Mes signalements » ; modérateurs désignés par `MIC_MODERATORS` |
+| 24.2 Données personnelles | « Télécharger mes données » en JSON ou en page HTML lisible |
+| 26. Économie de données et hors ligne | Mode MIC Lite (photos légères, pas de lecture automatique, pas de polices web), consommation réseau de la session ; application installable (manifeste, icônes) ; service worker : application et discussions déjà vues disponibles hors ligne, messages écrits hors ligne envoyés au retour du réseau |
 
 ## Ce qui reste à faire (et pourquoi)
 
 Le cahier décrit une application native destinée à une équipe d'environ 40
 personnes (section 28.3). Ce prototype valide le produit ; il ne remplace pas :
 
-- **Chiffrement de bout en bout** (Signal / MLS, section 21) : ici les messages
-  sont stockés en clair côté serveur et l'interface le dit honnêtement.
-- **Envoi réel des SMS** (fournisseur OTP à choisir, annexe D), vérification en deux étapes, passkeys.
-- Pour les appels : un serveur **TURN** (à définir avec `MIC_ICE_SERVERS`, sinon certains réseaux
-  d'entreprise ou mobiles bloquent la connexion), un **SFU** pour les grands appels de groupe (ici
-  chaque participant se connecte à chacun, adapté jusqu'à environ 6 personnes), les liens d'appel,
-  le partage d'écran et les effets en direct.
-- Pour les vocaux : transcription, coupe du début / de la fin avant envoi, vocaux en vue unique,
-  brouillon vocal conservé quand on quitte la discussion.
-- Live, MIC Effects Studio, communautés, événements, canaux ; pour les Clips : montage, sons,
-  duo / remix, transcodage serveur (les vidéos sont servies telles qu'envoyées).
-- Alerte de capture d'écran (impossible à détecter dans un navigateur), sauvegarde chiffrée,
-  appareils liés, verrouillage de discussion.
-- Modération outillée, Family Center, vérification de l'âge, conformité par pays (sections 22 à 24).
-- Applications mobiles natives et architecture distribuée (section 27).
+- **Chiffrement de bout en bout** (Signal / MLS, section 21) : ici les messages sont
+  stockés côté serveur et l'interface le dit honnêtement dans chaque discussion.
+- **Envoi réel des SMS** (fournisseur OTP à choisir, annexe D), vérification en deux
+  étapes, passkeys, appareils liés, sauvegarde chiffrée.
+- **Applications mobiles natives** et architecture distribuée (section 27) ; serveur
+  TURN et SFU pour les appels à grande échelle ; transcodage et diffusion adaptative
+  des vidéos.
+- Live, MIC Effects Studio, MIC Privé, publicité, monétisation (phases 2 et 3).
+- Family Center (phase 1.5), vérification de l'âge, conformité par pays, rapports de
+  transparence publiés (sections 22 à 24).
+- Alerte de capture d'écran (impossible à détecter dans un navigateur).
+- Traductions relues par des locuteurs natifs (règle des 98 % de la section 3.2).
 
 ## Architecture
 
@@ -108,13 +111,20 @@ server/
   social.js        règles de visibilité (amis, proches, abonnés, blocages)
   views.js         mise en forme des réponses (« une personne, deux visages »)
   realtime.js      hub WebSocket : messages, accusés, présence, « écrit… »
+  privacy.js       réglages de confidentialité (20.2) et valeurs pour les mineurs
   routes/          account · people · chats · stories · world · calls (signalisation WebRTC)
+                   · moderation · channels (canaux, listes de diffusion)
+                   · communities (communautés, événements) · export
   seed.js          données de démonstration
 public/
   index.html, css/styles.css (MIC Design System), img/logo.svg
   js/app.js        routeur et coquille ; js/i18n.js (EN/FR) ; js/ui.js (composants)
   js/voice.js      enregistreur et lecteur de vocaux ; js/calls.js (appels WebRTC)
+  js/outbox.js     file d'envoi hors ligne ; js/datasaver.js (mode Lite)
+  js/locales/      es · pt · ar · sw (chargées à la demande)
+  sw.js            service worker ; manifest.webmanifest et icônes
   js/screens/      auth · chats · stories · create (caméra + sélecteur d'audience) · world · me
+                   · safety (modération) · channels · communities
 test/              tests d'intégration (API, vocaux, signalisation des appels)
 ```
 
