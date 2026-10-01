@@ -2703,3 +2703,34 @@ body[data-universe='world'] .mine .bubble {
 [dir='rtl'] body {
   font-family: 'Noto Sans Arabic', 'Noto Naskh Arabic', var(--font-ui);
 }
+
+/* ---------- Barre d'état des écrans bord à bord (application Android, PWA iOS) ---------- */
+body {
+  padding-top: env(safe-area-inset-top);
+}
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top);
+  background: var(--bg);
+  z-index: 70;
+}
+.topbar,
+.mini-player,
+.offline {
+  top: env(safe-area-inset-top);
+}
+.call-pill {
+  top: calc(10px + env(safe-area-inset-top));
+}
+.viewer,
+.call-screen,
+.vo-viewer {
+  padding-top: env(safe-area-inset-top);
+}
+.call-incoming {
+  padding-top: calc(var(--s4) + env(safe-area-inset-top));
+}

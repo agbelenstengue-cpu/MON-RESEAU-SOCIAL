@@ -1,0 +1,103 @@
+# Construit les applications MIC (Windows .exe, Android .apk) et les publie
+# dans les « Releases » du dépôt.
+name: Applications MIC
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Construire le .exe
+        run: npx electron-builder --win --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MIC-Windows
+          path: dist/*.exe
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npx cap sync android
+      - name: Construire l'APK
+        working-directory: mobile/android
+        env:
+          MIC_VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Nommer l'APK
+        run: |
+          version=$(node -p "require('./package.json').version")
+          mkdir -p ../dist
+          cp android/app/build/outputs/apk/release/app-release.apk "../dist/MIC-${version}.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MIC-Android
+          path: dist/*.apk
+
+  release:
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lire la version
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Publier la version
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: MIC ${{ steps.version.outputs.version }}
+          make_latest: true
+          files: out/*
+          body: |
+            **MIC — Monde Interconnecté** pour Windows et Android.
+
+            ### Windows (64 bits)
+            - `MIC-Setup-${{ steps.version.outputs.version }}.exe` : installateur (raccourci sur le Bureau et dans le menu Démarrer).
+            - `MIC-${{ steps.version.outputs.version }}-portable.exe` : version portable, se lance sans installation.
+
+            Au premier lancement, des comptes de démonstration sont créés (par exemple +237 670000001 pour @angele) ;
+            le code de vérification s'affiche à l'écran. Les données restent sur cet ordinateur.
+            L'application n'est pas signée : si Windows SmartScreen s'affiche, cliquez sur
+            « Informations complémentaires », puis « Exécuter quand même ».
+
+            ### Android (7.0 et plus récent)
+            - `MIC-${{ steps.version.outputs.version }}.apk` : téléchargez-le sur le téléphone, ouvrez-le et autorisez
+              l'installation depuis cette source si Android le demande.
+
+            L'application Android se connecte à un serveur MIC. Le plus simple : sur le PC, dans l'application MIC pour
+            Windows, menu **Android → Partager sur le réseau local**, puis saisissez sur le téléphone l'adresse affichée
+            (par exemple `http://192.168.1.10:37238`). Le téléphone doit être sur le même Wi-Fi que le PC.
+            Sur le réseau local (http), le micro et la caméra du téléphone ne sont pas disponibles : les vocaux, les appels
+            et les Clips filmés demandent un serveur en https.

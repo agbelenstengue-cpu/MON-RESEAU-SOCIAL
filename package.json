@@ -1,6 +1,6 @@
 {
   "name": "mic-interconnected-world",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MIC — Monde Interconnecté : prototype web du réseau social (Me / World)",
   "private": true,
   "type": "module",
