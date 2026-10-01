@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <title>MIC</title>
+  <!-- Bouche stylisée qui sourit, une seule ligne continue (2.1) -->
+  <path d="M8 26c6-5 12-6 16-3 3 2 5 2 8 0 3-2 5-2 8 0 4-3 10-2 16 3-5 14-14 22-24 22S13 40 8 26z" stroke="#3B2418" stroke-width="3.5"/>
+  <path d="M15 29c9 8 25 8 34 0" stroke="#1F6B4F" stroke-width="3"/>
+</svg>
