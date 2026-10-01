@@ -14,6 +14,7 @@ export function makeViews(db, social, hub) {
     tags: db.prepare('SELECT tag FROM post_hashtags WHERE post_id = ?'),
     reactions: db.prepare('SELECT user_id, emoji FROM message_reactions WHERE message_id = ?'),
     msg: db.prepare('SELECT * FROM messages WHERE id = ?'),
+    plays: db.prepare('SELECT user_id FROM voice_plays WHERE message_id = ?'),
     post: db.prepare('SELECT * FROM posts WHERE id = ?'),
   };
 
@@ -105,12 +106,29 @@ export function makeViews(db, social, hub) {
         kind: m.kind,
         body: m.deleted ? '' : m.body,
         media: m.deleted ? null : m.media,
+        meta: null,
         deleted: !!m.deleted,
         editedAt: m.edited_at,
         createdAt: m.created_at,
         reactions: q.reactions.all(m.id).map((r) => ({ userId: r.user_id, emoji: r.emoji })),
       };
       if (m.sender_id === viewerId && members) out.status = views.messageStatus(m, members);
+      if (m.meta && !m.deleted) {
+        try {
+          out.meta = JSON.parse(m.meta);
+        } catch {
+          out.meta = null;
+        }
+      }
+      // Vocal : écouté par moi ? écouté par tous les autres (micro vert côté expéditeur, 9.4) ?
+      if (m.kind === 'voice' && !m.deleted) {
+        const played = new Set(q.plays.all(m.id).map((r) => r.user_id));
+        out.playedByMe = m.sender_id === viewerId || played.has(viewerId);
+        if (m.sender_id === viewerId && members) {
+          const others = members.filter((mb) => mb.user_id !== m.sender_id && mb.status === 'active');
+          out.played = others.length > 0 && others.every((mb) => played.has(mb.user_id));
+        }
+      }
       if (m.reply_to) {
         const r = q.msg.get(m.reply_to);
         if (r && r.conversation_id === m.conversation_id) {

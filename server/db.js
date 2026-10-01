@@ -104,9 +104,10 @@ CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   sender_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  kind TEXT NOT NULL DEFAULT 'text', -- text | image | post | system
+  kind TEXT NOT NULL DEFAULT 'text', -- text | image | voice | post | call | system
   body TEXT NOT NULL DEFAULT '',
   media TEXT,
+  meta TEXT, -- JSON : durée et onde d'un vocal, résumé d'un appel
   post_id INTEGER,
   reply_to INTEGER,
   edited_at INTEGER,
@@ -204,6 +205,36 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at INTEGER NOT NULL
 );
 
+-- Statut « écouté » des vocaux (9.4).
+CREATE TABLE IF NOT EXISTS voice_plays (
+  message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  played_at INTEGER NOT NULL,
+  PRIMARY KEY (message_id, user_id)
+);
+
+-- Appels (section 10). Le contenu des appels ne transite jamais par le serveur :
+-- seule la signalisation WebRTC et l'historique sont gérés ici.
+CREATE TABLE IF NOT EXISTS calls (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  caller_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  type TEXT NOT NULL, -- audio | video
+  status TEXT NOT NULL DEFAULT 'ringing', -- ringing | ongoing | ended | missed
+  created_at INTEGER NOT NULL,
+  answered_at INTEGER,
+  ended_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS call_participants (
+  call_id INTEGER NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  joined_at INTEGER,
+  left_at INTEGER,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (call_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS reports (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -219,7 +250,14 @@ export function openDatabase(file) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec(SCHEMA);
+  migrate(db);
   return db;
+}
+
+// Colonnes ajoutées après la première version : mise à niveau des bases existantes.
+function migrate(db) {
+  const cols = db.prepare('PRAGMA table_info(messages)').all().map((c) => c.name);
+  if (!cols.includes('meta')) db.exec('ALTER TABLE messages ADD COLUMN meta TEXT');
 }
 
 // Petite aide pour exécuter plusieurs écritures de façon atomique.

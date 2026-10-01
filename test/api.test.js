@@ -1,56 +1,7 @@
-import { test, before, after } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { WebSocket } from 'ws';
-import { createServer } from '../server/app.js';
-
-const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-let server;
-let base;
-let tmp;
-
-before(async () => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mic-test-'));
-  ({ server } = createServer({ dbFile: ':memory:', uploadsDir: path.join(tmp, 'uploads'), devOtp: true }));
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  base = `http://127.0.0.1:${server.address().port}`;
-});
-
-after(() => {
-  server.close();
-  fs.rmSync(tmp, { recursive: true, force: true });
-});
-
-async function call(method, url, body, token) {
-  const res = await fetch(base + '/api' + url, {
-    method,
-    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const data = await res.json();
-  return { status: res.status, data };
-}
-
-let phoneSeq = 100000;
-async function signup(username, { birthDate = '1995-04-12', joinWorld = true } = {}) {
-  const phone = `+2376${phoneSeq++}00`;
-  const otp = await call('POST', '/auth/request-otp', { phone });
-  assert.equal(otp.status, 200);
-  const v = await call('POST', '/auth/verify', { phone, code: otp.data.devCode });
-  assert.equal(v.data.needsSignup, true);
-  const s = await call('POST', '/auth/signup', {
-    ticket: v.data.ticket, birthDate, displayName: username.toUpperCase(), username, joinWorld,
-  });
-  return { ...s, phone };
-}
-
-async function befriend(a, b) {
-  await call('POST', `/users/${b.user.id}/friend-request`, {}, a.token);
-  const r = await call('POST', `/friend-requests/${a.user.id}/accept`, {}, b.token);
-  assert.equal(r.data.status, 'friends');
-}
+import { PIXEL, ctx, call, signup, befriend } from './helpers.js';
 
 test('inscription, connexion et règles du compte', async () => {
   const s = await signup('angele');
@@ -292,7 +243,7 @@ test('temps réel : nouveau message poussé par WebSocket', async () => {
   const b = (await signup('ursula')).data;
   await befriend(a, b);
   const conv = (await call('POST', '/conversations/direct', { userId: b.user.id }, a.token)).data;
-  const ws = new WebSocket(`${base.replace('http', 'ws')}/ws?token=${b.token}`);
+  const ws = new WebSocket(`${ctx.base.replace('http', 'ws')}/ws?token=${b.token}`);
   await new Promise((r) => ws.once('open', r));
   const got = new Promise((resolve) => {
     ws.on('message', (raw) => {

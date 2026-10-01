@@ -6,6 +6,14 @@ const EDIT_WINDOW = 15 * 60 * 1000; // 8.5
 const DELETE_WINDOW = 48 * 3600 * 1000; // 8.5
 const MAX_BODY = 4096;
 const MAX_GROUP = 1024;
+const MAX_VOICE = 60 * 60 * 1000; // 9.1
+
+// Métadonnées d'un vocal : durée (ms) et onde sonore (64 valeurs entre 0 et 1).
+function voiceMeta(b) {
+  const duration = Math.round(Number(b.duration));
+  const waveform = Array.isArray(b.waveform) ? b.waveform.slice(0, 64).map((v) => Math.max(0, Math.min(1, Number(v) || 0))) : [];
+  return { duration: Number.isFinite(duration) && duration > 0 ? Math.min(duration, MAX_VOICE) : 0, waveform: waveform.map((v) => Math.round(v * 100) / 100) };
+}
 
 export default function chatRoutes(api, ctx) {
   const { db, social, views, hub, saveMedia, HttpError } = ctx;
@@ -30,8 +38,9 @@ export default function chatRoutes(api, ctx) {
       WHERE conversation_id = ? AND id > ? AND (sender_id IS NULL OR sender_id != ?) AND deleted = 0`),
     page: db.prepare('SELECT * FROM messages WHERE conversation_id = ? AND id < ? ORDER BY id DESC LIMIT ?'),
     msg: db.prepare('SELECT * FROM messages WHERE id = ?'),
-    insertMsg: db.prepare(`INSERT INTO messages (conversation_id, sender_id, kind, body, media, post_id, reply_to, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+    insertMsg: db.prepare(`INSERT INTO messages (conversation_id, sender_id, kind, body, media, post_id, reply_to, created_at, meta)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+    play: db.prepare('INSERT OR IGNORE INTO voice_plays (message_id, user_id, played_at) VALUES (?, ?, ?)'),
     editMsg: db.prepare('UPDATE messages SET body = ?, edited_at = ? WHERE id = ?'),
     deleteMsg: db.prepare('UPDATE messages SET deleted = 1, body = \'\', media = NULL WHERE id = ?'),
     react: db.prepare('INSERT OR REPLACE INTO message_reactions (message_id, user_id, emoji) VALUES (?, ?, ?)'),
@@ -72,6 +81,7 @@ export default function chatRoutes(api, ctx) {
       lastMessage: last ? views.message(last, viewerId, members) : null,
       updatedAt: last?.created_at ?? c.created_at,
       memberCount: members.length,
+      activeCall: ctx.activeCallFor?.(c.id, viewerId) ?? null,
     };
     if (c.type === 'direct') {
       const other = others[0] ? q.user.get(others[0].user_id) : null;
@@ -112,11 +122,12 @@ export default function chatRoutes(api, ctx) {
   // « écrit… » (8.4) : relayé aux autres membres, jamais stocké.
   hub.on('message', (userId, msg) => {
     if (msg?.type !== 'typing') return;
+    const activity = msg.activity === 'recording' ? 'recording' : 'typing';
     const convId = Number(msg.conversationId);
     const me = q.member.get(convId, userId);
     if (!me || me.status !== 'active') return;
     const ids = memberIds(convId).filter((id) => id !== userId && !social.isBlockedEither(id, userId));
-    hub.sendMany(ids, 'typing', { conversationId: convId, userId });
+    hub.sendMany(ids, 'typing', { conversationId: convId, userId, activity });
   });
 
   api.get('/conversations', (req, res) => {
@@ -156,7 +167,7 @@ export default function chatRoutes(api, ctx) {
       const cid = Number(q.insertConv.run('group', title, req.user.id, now()).lastInsertRowid);
       q.insertMember.run(cid, req.user.id, 'admin', 'active', now());
       for (const id of ids) q.insertMember.run(cid, id, 'member', 'active', now());
-      q.insertMsg.run(cid, req.user.id, 'system', 'group_created', null, null, null, now());
+      q.insertMsg.run(cid, req.user.id, 'system', 'group_created', null, null, null, now(), null);
       return cid;
     });
     hub.sendMany(ids, 'conversation:new', { id: convId });
@@ -188,7 +199,7 @@ export default function chatRoutes(api, ctx) {
       for (const id of ids) {
         if (q.member.get(conv.id, id)) continue;
         q.insertMember.run(conv.id, id, 'member', 'active', now());
-        q.insertMsg.run(conv.id, id, 'system', 'member_added', null, null, null, now());
+        q.insertMsg.run(conv.id, id, 'system', 'member_added', null, null, null, now(), null);
       }
     });
     hub.sendMany(memberIds(conv.id), 'conversation:update', { id: conv.id });
@@ -213,7 +224,7 @@ export default function chatRoutes(api, ctx) {
     if (userId !== req.user.id && me.role !== 'admin') throw new HttpError(403, 'admin_only');
     tx(db, () => {
       q.removeMember.run(conv.id, userId);
-      q.insertMsg.run(conv.id, userId, 'system', userId === req.user.id ? 'member_left' : 'member_removed', null, null, null, now());
+      q.insertMsg.run(conv.id, userId, 'system', userId === req.user.id ? 'member_left' : 'member_removed', null, null, null, now(), null);
       // Un groupe garde toujours au moins un admin (11.6).
       const rest = q.members.all(conv.id);
       if (rest.length && !rest.some((m) => m.role === 'admin')) q.setRole.run('admin', conv.id, rest[0].user_id);
@@ -250,8 +261,8 @@ export default function chatRoutes(api, ctx) {
   api.post('/conversations/:id/messages', (req, res) => {
     const { conv, me } = membership(req.params.id, req.user.id);
     const b = req.body ?? {};
-    const kind = ['text', 'image'].includes(b.kind) ? b.kind : 'text';
-    const body = String(b.body ?? '').slice(0, MAX_BODY);
+    const kind = ['text', 'image', 'voice'].includes(b.kind) ? b.kind : 'text';
+    const body = kind === 'voice' ? '' : String(b.body ?? '').slice(0, MAX_BODY);
     if (kind === 'text' && !body.trim()) throw new HttpError(400, 'empty_message');
     if (conv.type === 'group' && conv.announce_only && me.role !== 'admin') throw new HttpError(403, 'admins_only');
     if (conv.type === 'direct') {
@@ -259,8 +270,10 @@ export default function chatRoutes(api, ctx) {
       if (!other) throw new HttpError(403, 'conversation_closed');
       if (social.isBlockedEither(req.user.id, other.user_id)) throw new HttpError(403, 'blocked');
     }
-    const media = kind === 'image' ? saveMedia(b.media) : null;
-    if (kind === 'image' && !media) throw new HttpError(400, 'invalid_media');
+    let meta = null;
+    if (kind === 'voice') meta = JSON.stringify(voiceMeta(b));
+    const media = kind === 'text' ? null : saveMedia(b.media, kind === 'voice' ? 'audio' : 'image');
+    if (kind !== 'text' && !media) throw new HttpError(400, 'invalid_media');
     let replyTo = null;
     if (b.replyTo) {
       const r = q.msg.get(Number(b.replyTo));
@@ -269,7 +282,7 @@ export default function chatRoutes(api, ctx) {
     const id = tx(db, () => {
       // Répondre à une demande de message vaut acceptation.
       if (me.status === 'request') q.setStatus.run('active', conv.id, req.user.id);
-      const mid = Number(q.insertMsg.run(conv.id, req.user.id, kind, body, media, null, replyTo, now()).lastInsertRowid);
+      const mid = Number(q.insertMsg.run(conv.id, req.user.id, kind, body, media, null, replyTo, now(), meta).lastInsertRowid);
       q.markRead.run(mid, mid, conv.id, req.user.id);
       // Les destinataires connectés reçoivent immédiatement : « distribué ».
       for (const mb of q.members.all(conv.id)) {
@@ -290,7 +303,7 @@ export default function chatRoutes(api, ctx) {
       const other = q.members.all(conv.id).find((m) => m.user_id !== userId);
       if (!other || social.isBlockedEither(userId, other.user_id)) throw new HttpError(403, 'blocked');
     }
-    const mid = Number(q.insertMsg.run(conv.id, userId, 'post', String(body).slice(0, MAX_BODY), null, postId, null, now()).lastInsertRowid);
+    const mid = Number(q.insertMsg.run(conv.id, userId, 'post', String(body).slice(0, MAX_BODY), null, postId, null, now(), null).lastInsertRowid);
     q.markRead.run(mid, mid, conv.id, userId);
     pushMessage(conv.id, mid);
     return mid;
@@ -344,6 +357,24 @@ export default function chatRoutes(api, ctx) {
     pushMessage(m.conversation_id, m.id, 'message:update');
     res.json({ ok: true });
   });
+
+  // Statut « écouté » d'un vocal (9.4).
+  api.post('/messages/:id/played', (req, res) => {
+    const { m, me } = ownMessage(req);
+    if (m.kind !== 'voice' || m.deleted) throw new HttpError(400, 'not_voice');
+    if (m.sender_id !== req.user.id && me.status === 'active') {
+      q.play.run(m.id, req.user.id, now());
+      pushMessage(m.conversation_id, m.id, 'message:update');
+    }
+    res.json({ ok: true });
+  });
+
+  // Message d'événement (appel terminé ou manqué) inséré par le module d'appels.
+  ctx.postEventMessage = (convId, senderId, kind, meta) => {
+    const mid = Number(q.insertMsg.run(convId, senderId, kind, '', null, null, null, now(), JSON.stringify(meta)).lastInsertRowid);
+    pushMessage(convId, mid);
+    return mid;
+  };
 
   // Accusés de lecture : pas envoyés tant qu'une demande n'est pas acceptée (7.3).
   api.post('/conversations/:id/read', (req, res) => {

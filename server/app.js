@@ -13,6 +13,7 @@ import peopleRoutes from './routes/people.js';
 import chatRoutes from './routes/chats.js';
 import storyRoutes from './routes/stories.js';
 import worldRoutes from './routes/world.js';
+import callRoutes from './routes/calls.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -42,7 +43,7 @@ export function createServer({
 
   const app = express();
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '8mb' }));
+  app.use(express.json({ limit: '16mb' }));
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
     res.set('Referrer-Policy', 'same-origin');
@@ -69,14 +70,20 @@ export function createServer({
     hub.send(userId, 'notification', { type });
   };
 
-  // Téléversement des médias (images) : data URL → fichier.
-  const saveMedia = (dataUrl) => {
+  // Téléversement des médias : data URL → fichier. Images (5 Mo) et audio (10 Mo).
+  const MEDIA = {
+    image: { types: { png: 'png', jpeg: 'jpg', webp: 'webp', gif: 'gif' }, max: 5 * 1024 * 1024 },
+    audio: { types: { webm: 'webm', ogg: 'ogg', mp4: 'm4a', mpeg: 'mp3', wav: 'wav' }, max: 10 * 1024 * 1024 },
+  };
+  const saveMedia = (dataUrl, kind = 'image') => {
     if (dataUrl == null || dataUrl === '') return null;
-    const m = /^data:image\/(png|jpeg|webp|gif);base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl));
-    if (!m) throw new HttpError(400, 'invalid_media');
-    const buf = Buffer.from(m[2], 'base64');
-    if (buf.length > 5 * 1024 * 1024) throw new HttpError(413, 'media_too_large');
-    const name = `${crypto.randomBytes(16).toString('hex')}.${m[1] === 'jpeg' ? 'jpg' : m[1]}`;
+    const m = /^data:(image|audio)\/([\w.+-]+)((?:;[\w-]+=[\w.+-]+)*);base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl));
+    const spec = MEDIA[kind];
+    const ext = m && m[1] === kind && spec.types[m[2]];
+    if (!ext) throw new HttpError(400, 'invalid_media');
+    const buf = Buffer.from(m[4], 'base64');
+    if (buf.length > spec.max) throw new HttpError(413, 'media_too_large');
+    const name = `${crypto.randomBytes(16).toString('hex')}.${ext}`;
     fs.writeFileSync(path.join(uploadsDir, name), buf);
     return `/uploads/${name}`;
   };
@@ -88,6 +95,7 @@ export function createServer({
   api.use(requireAuth);
   peopleRoutes(api, ctx);
   chatRoutes(api, ctx);
+  callRoutes(api, ctx);
   storyRoutes(api, ctx);
   worldRoutes(api, ctx);
   api.use((req, res, next) => next(new HttpError(404, 'not_found')));
