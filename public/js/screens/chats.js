@@ -29,6 +29,7 @@ function previewText(m, c) {
   const who = c.type === 'group' && m.sender && m.sender.id !== store.me.id ? `${m.sender.name}: ` : '';
   if (m.deleted) return t('chat.deleted');
   if (m.kind === 'system') return systemText(m);
+  if (m.viewOnce) return `${who}① ${t(m.kind === 'voice' ? 'voice.message' : 'chat.photo')}`;
   if (m.kind === 'image') return `${who}📷 ${t('chat.photo')}`;
   if (m.kind === 'voice') return `${who}🎤 ${t('voice.message')} (${fmtDuration(m.meta?.duration)})`;
   if (m.kind === 'call') return callText(m);
@@ -43,6 +44,11 @@ function callText(m) {
 }
 
 function systemText(m) {
+  if (m.body === 'timer_set') {
+    const timer = m.meta?.timer || 0;
+    const self = m.sender?.id === store.me.id ? '_self' : '';
+    return t(`chat.sys.timer_${timer ? 'on' : 'off'}${self}`, { name: m.sender?.name || '', timer: t(`timer.${timer}`) });
+  }
   return t(`chat.sys.${m.body}`, { name: m.sender?.name || '' });
 }
 
@@ -134,13 +140,14 @@ export async function chatScreen(root, { id }) {
   let typingUntil = 0;
   let lastTypingSent = 0;
   let loadingOlder = false;
+  let viewOnceNext = false; // prochaine photo / prochain vocal en vue unique
   let noMore = false;
 
   const header = () => html`${backButton()}
     <a class="row grow" style="color:inherit" ${conv.type === 'direct' && conv.peer ? raw(`href="#/u/${encodeURIComponent(conv.peer.username)}"`) : raw('href="#" data-info')}>
       ${convAvatar(conv, 'sm')}
       <span class="grow" style="min-width:0">
-        <span style="display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${convName(conv)}</span>
+        <span style="display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${convName(conv)}${conv.messageTimer ? html` <span class="timer-badge" title="${t('timer.title')}">${icon('timer', 'width="13" height="13"')} ${t(`timer.short.${conv.messageTimer}`)}</span>` : ''}</span>
         <span class="small muted" data-presence>${subtitle()}</span>
       </span>
     </a>
@@ -211,6 +218,7 @@ export async function chatScreen(root, { id }) {
         : '';
     let content;
     if (m.deleted) content = html`<span class="deleted">${t('chat.deleted')}</span>`;
+    else if (m.viewOnce) content = viewOnceBubble(m, mine);
     else if (m.kind === 'image') content = html`<img class="media" src="${m.media}" alt="${t('chat.photo')}" loading="lazy" />${m.body ? html`<div class="text">${richText(m.body)}</div>` : ''}`;
     else if (m.kind === 'voice') content = voiceBubble(m, mine);
     else if (m.kind === 'post') content = html`${postCard(m.post)}${m.body ? html`<div class="text">${richText(m.body)}</div>` : ''}`;
@@ -246,6 +254,59 @@ export async function chatScreen(root, { id }) {
             : html`<span class="vdot" title="${t('voice.unplayed')}"></span>`}
       </div>
     </div>`;
+  };
+
+  // Vue unique (8.9) : le contenu ne s'ouvre qu'une fois, jamais pour l'expéditeur.
+  const viewOnceBubble = (m, mine) => {
+    const label = t(m.kind === 'voice' ? 'voice.message' : 'chat.photo');
+    if (mine || m.opened) {
+      return html`<div class="vo ${m.opened ? 'opened' : ''}"><span class="vo-mark">1</span>${label} · ${m.opened ? t('vo.opened') : t('vo.label')}</div>`;
+    }
+    return html`<button class="vo vo-open" data-open="${m.id}"><span class="vo-mark">1</span>${label} · ${t('vo.tapToOpen')}</button>`;
+  };
+
+  const openViewOnce = async (m) => {
+    let media;
+    try {
+      ({ media } = await post(`/messages/${m.id}/open`));
+    } catch (err) {
+      return showError(err);
+    }
+    m.opened = true;
+    drawList(false);
+    const el = document.createElement('div');
+    el.className = 'vo-viewer';
+    el.setAttribute('role', 'dialog');
+    mount(
+      el,
+      html`<button class="icon-btn" data-close aria-label="${t('common.close')}">${icon('close')}</button>
+        ${m.kind === 'voice'
+          ? html`<div class="center"><div class="vo-mark big">1</div><p>${t('voice.message')}</p><audio src="${media}" autoplay controls controlslist="nodownload noplaybackrate"></audio></div>`
+          : html`<img src="${media}" alt="" draggable="false" />`}
+        <p class="small vo-note">${t('vo.note')}</p>`
+    );
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    $('[data-close]', el).addEventListener('click', () => el.remove());
+    document.body.appendChild(el);
+  };
+
+  const openTimer = () => {
+    const options = [0, 86400000, 604800000, 7776000000];
+    actionSheet(
+      options.map((v) => ({
+        label: `${t(`timer.${v}`)}${conv.messageTimer === v ? ' ✓' : ''}`,
+        icon: 'timer',
+        run: async () => {
+          try {
+            conv = await put(`/conversations/${convId}/timer`, { timer: v });
+            drawHead();
+          } catch (err) {
+            showError(err);
+          }
+        },
+      })),
+      { title: t('timer.title'), header: html`<p class="muted small" style="margin:0 16px 8px">${t('timer.lead')}</p>` }
+    );
   };
 
   const voiceOpts = (m) => ({
@@ -338,6 +399,7 @@ export async function chatScreen(root, { id }) {
       html`${bar}
         <form class="composer" data-composer>
           <label class="icon-btn" aria-label="${t('chat.photo')}">${icon('image')}<input type="file" accept="image/*" data-file hidden /></label>
+          ${editing ? '' : html`<button type="button" class="icon-btn vo-toggle ${viewOnceNext ? 'on' : ''}" data-vo aria-pressed="${viewOnceNext}" title="${t('vo.toggle')}" aria-label="${t('vo.toggle')}"><span class="vo-mark">1</span></button>`}
           <textarea rows="1" data-input placeholder="${t('chat.placeholder')}" aria-label="${t('chat.placeholder')}">${editing ? editing.body : ''}</textarea>
           <button class="send" type="submit" data-send aria-label="${t('share.send')}" ${editing ? '' : 'hidden'}>${icon('send')}</button>
           ${editing ? '' : html`<button class="send mic" type="button" data-mic aria-label="${t('voice.record')}" title="${t('voice.holdHint')}">${icon('mic')}</button>`}
@@ -352,6 +414,12 @@ export async function chatScreen(root, { id }) {
       $('[data-mic]', bottom).hidden = hasText;
     };
     input.addEventListener('input', syncButtons);
+    $('[data-vo]', bottom)?.addEventListener('click', (e) => {
+      viewOnceNext = !viewOnceNext;
+      e.currentTarget.classList.toggle('on', viewOnceNext);
+      e.currentTarget.setAttribute('aria-pressed', viewOnceNext);
+      toast(viewOnceNext ? t('vo.nextOn') : t('vo.nextOff'));
+    });
     $('[data-mic]', bottom)?.addEventListener('pointerdown', (e) => beginRecording(e));
     $('[data-cancel]', bottom)?.addEventListener('click', () => {
       replyTo = null;
@@ -401,8 +469,9 @@ export async function chatScreen(root, { id }) {
       if (!file) return;
       try {
         const media = await readImage(file);
-        const m = await post(`/conversations/${convId}/messages`, { kind: 'image', media, body: input.value.trim(), replyTo: replyTo?.id });
+        const m = await post(`/conversations/${convId}/messages`, { kind: 'image', media, body: viewOnceNext ? '' : input.value.trim(), replyTo: replyTo?.id, viewOnce: viewOnceNext });
         replyTo = null;
+        viewOnceNext = false;
         upsert(m);
         drawBottom();
         drawList('force');
@@ -514,9 +583,10 @@ export async function chatScreen(root, { id }) {
     if (result.duration < 700) return toast(t('voice.tooShort'));
     try {
       const media = await blobToDataUrl(result.blob);
-      const m = await post(`/conversations/${convId}/messages`, { kind: 'voice', media, duration: Math.round(result.duration), waveform: result.waveform, replyTo: replyTo?.id });
+      const m = await post(`/conversations/${convId}/messages`, { kind: 'voice', media, duration: Math.round(result.duration), waveform: result.waveform, replyTo: replyTo?.id, viewOnce: viewOnceNext });
       URL.revokeObjectURL(result.url);
       replyTo = null;
+      viewOnceNext = false;
       upsert(m);
       drawBottom();
       drawList('force');
@@ -632,6 +702,12 @@ export async function chatScreen(root, { id }) {
 
   list.addEventListener('click', (e) => {
     if (e.target.closest('a')) return;
+    const vo = e.target.closest('[data-open]');
+    if (vo) {
+      const m = messages.find((x) => x.id === Number(vo.dataset.open));
+      if (m) openViewOnce(m);
+      return;
+    }
     const cb = e.target.closest('[data-callback]');
     if (cb) return startCall(conv, cb.dataset.callback);
     const v = e.target.closest('[data-v]');
@@ -681,6 +757,7 @@ export async function chatScreen(root, { id }) {
     if (conv.type === 'group') return openGroupInfo();
     const items = [];
     if (conv.peer) items.push({ label: t('chat.viewProfile'), icon: 'me', run: () => go(`u/${conv.peer.username}`) });
+    if (conv.status === 'active' && !conv.blocked) items.push({ label: t('timer.title'), icon: 'timer', run: openTimer });
     if (conv.peer && !conv.blocked) items.push({ label: t('chat.block'), icon: 'block', danger: true, run: blockPeer });
     if (conv.peer) items.push({ label: t('chat.report'), icon: 'flag', danger: true, run: () => reportFlow('user', conv.peer.id) });
     actionSheet(items);
@@ -698,6 +775,7 @@ export async function chatScreen(root, { id }) {
                 <button class="list-item" data-rename>${icon('edit')}<span class="grow">${t('chat.groupName')}</span></button>
                 <label class="list-item">${icon('info')}<span class="grow">${t('chat.announceSetting')}</span><input type="checkbox" class="toggle" data-announce ${conv.announceOnly ? 'checked' : ''} /></label>
                 <button class="list-item" data-add>${icon('userPlus')}<span class="grow">${t('chat.addMembers')}</span></button>
+                <button class="list-item" data-timer>${icon('timer')}<span class="grow">${t('timer.title')}</span><span class="small muted">${t(`timer.${conv.messageTimer || 0}`)}</span></button>
               </div>`
             : ''}
           <div class="section-title">${t('chat.members', { count: conv.memberCount })}</div>
@@ -726,6 +804,10 @@ export async function chatScreen(root, { id }) {
       $('[data-announce]', box)?.addEventListener('change', async (e) => {
         conv = await patch(`/conversations/${convId}`, { announceOnly: e.target.checked });
         drawBottom();
+      });
+      $('[data-timer]', box)?.addEventListener('click', () => {
+        close();
+        openTimer();
       });
       $('[data-add]', box)?.addEventListener('click', async () => {
         close();
@@ -807,6 +889,11 @@ export async function chatScreen(root, { id }) {
       }
     }),
     on('voice:progress', (st) => updateVoice(st)),
+    on('message:expired', (d) => {
+      if (d.conversationId !== convId) return;
+      messages = messages.filter((x) => x.id !== d.id);
+      drawList(false);
+    }),
     on('call:update', (d) => {
       if (d.conversationId !== convId) return;
       conv.activeCall = d.call;
@@ -824,11 +911,18 @@ export async function chatScreen(root, { id }) {
       }
     }),
   ];
+  // Les messages éphémères disparaissent aussi localement à l'échéance.
+  const expiryTimer = setInterval(() => {
+    const before = messages.length;
+    messages = messages.filter((x) => !x.expiresAt || x.expiresAt > Date.now());
+    if (messages.length !== before) drawList(false);
+  }, 15000);
   const onVisible = () => !document.hidden && markRead();
   document.addEventListener('visibilitychange', onVisible);
   return () => {
     offs.forEach((off) => off());
     clearTimeout(typingTimer);
+    clearInterval(expiryTimer);
     stopListening();
     rec?.recorder.cancel();
     rec = null;

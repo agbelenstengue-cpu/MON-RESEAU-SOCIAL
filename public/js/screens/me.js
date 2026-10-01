@@ -409,7 +409,7 @@ export async function settingsScreen(root) {
   const main = layout(root, { universe: 'me', title: t('me.settings'), left: backButton() });
   wireBack(root, 'me');
   const draw = async () => {
-    const blocked = await get('/blocked').catch(() => []);
+    const [blocked, privacy] = await Promise.all([get('/blocked').catch(() => []), get('/me/privacy').catch(() => null)]);
     let theme = 'auto';
     try {
       theme = localStorage.getItem('mic.theme') || 'auto';
@@ -432,6 +432,7 @@ export async function settingsScreen(root) {
           <a class="list-item" href="#/edit-profile">${icon('edit')}<span class="grow">${t('profile.editProfile')}</span></a>
         </div>
         <div class="section-title">${t('settings.privacy')}</div>
+        ${privacy ? privacyGroup(privacy) : ''}
         <div class="menu-group">
           ${w.enabled
             ? html`<label class="list-item">${icon('lock')}<span class="grow">${t('settings.worldPrivate')}<span class="preview" style="display:block;white-space:normal">${t('settings.worldPrivateHint')}</span></span><input type="checkbox" class="toggle" data-wprivate ${w.private ? 'checked' : ''} /></label>
@@ -466,6 +467,21 @@ export async function settingsScreen(root) {
       if (v === 'auto') delete document.documentElement.dataset.theme;
       else document.documentElement.dataset.theme = v;
     });
+    // Réglages de confidentialité (20.2) : enregistrés à chaque changement.
+    $$('[data-priv]', main).forEach((el) =>
+      el.addEventListener('change', async () => {
+        const key = el.dataset.priv;
+        const raw = el.type === 'checkbox' ? el.checked : el.value;
+        const value = key === 'defaultTimer' ? Number(raw) : raw;
+        try {
+          await patch('/me/privacy', { [key]: value });
+          toast(t('common.done'));
+        } catch (err) {
+          showError(err);
+          draw();
+        }
+      })
+    );
     $('[data-wprivate]', main)?.addEventListener('change', async (e) => {
       try {
         store.me = await patch('/me', { worldPrivate: e.target.checked });
@@ -503,4 +519,37 @@ export async function settingsScreen(root) {
     });
   };
   await draw();
+}
+
+const PRIV_ROWS = [
+  ['lastSeen', 'eye'],
+  ['profilePhoto', 'me'],
+  ['about', 'info'],
+  ['whoCanMessage', 'chats'],
+  ['whoCanCall', 'phone'],
+  ['whoCanMention', 'world'],
+  ['defaultTimer', 'archive'],
+];
+const PRIV_TOGGLES = [
+  ['readReceipts', 'checks'],
+  ['typingIndicator', 'edit'],
+  ['suggestAccount', 'userPlus'],
+];
+
+function privacyGroup({ settings, options, locked }) {
+  const label = (key, v) => (key === 'defaultTimer' ? t(`timer.${v}`) : t(`privacy.opt.${v}`));
+  return html`<div class="menu-group">
+      ${PRIV_ROWS.map(
+        ([key, ic]) => html`<label class="list-item">${icon(ic)}<span class="grow">${t(`privacy.${key}`)}${locked.includes(key) ? html`<span class="preview" style="display:block">${t('privacy.lockedMinor')}</span>` : ''}</span>
+          <select class="lang-select" data-priv="${key}" ${locked.includes(key) ? 'disabled' : ''}>${options[key].map(
+            (v) => html`<option value="${v}" ${settings[key] === v ? 'selected' : ''}>${label(key, v)}</option>`
+          )}</select></label>`
+      )}
+    </div>
+    <div class="menu-group">
+      ${PRIV_TOGGLES.map(
+        ([key, ic]) => html`<label class="list-item">${icon(ic)}<span class="grow">${t(`privacy.${key}`)}<span class="preview" style="display:block;white-space:normal">${t(`privacy.${key}Hint`)}</span></span>
+          <input type="checkbox" class="toggle" data-priv="${key}" ${settings[key] ? 'checked' : ''} /></label>`
+      )}
+    </div>`;
 }

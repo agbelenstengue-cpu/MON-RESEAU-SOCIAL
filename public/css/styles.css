@@ -132,6 +132,9 @@ img {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+[hidden] {
+  display: none !important;
+}
 .sr-only {
   position: absolute;
   width: 1px;
@@ -2184,4 +2187,87 @@ body[data-universe='world'] .mine .bubble {
   background: rgba(255, 255, 255, 0.1);
   color: #faf7f2;
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ---------- Éphémères et vue unique (8.8, 8.9) ---------- */
+.timer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  vertical-align: 1px;
+}
+.vo-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px dashed currentColor;
+  font-size: 10px;
+  font-weight: 700;
+  margin-right: 6px;
+  flex: none;
+}
+.vo-mark.big {
+  width: 56px;
+  height: 56px;
+  font-size: 24px;
+  margin: 0 auto 8px;
+}
+.vo {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+  background: none;
+  border: 0;
+  color: inherit;
+  padding: 4px 0;
+}
+.vo.opened {
+  opacity: 0.6;
+  font-weight: 400;
+}
+.vo-open {
+  cursor: pointer;
+}
+.vo-toggle {
+  color: var(--muted);
+}
+.vo-toggle.on {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+.vo-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  background: #000;
+  color: #faf7f2;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.vo-viewer img {
+  max-width: 100%;
+  max-height: 90vh;
+  pointer-events: none;
+}
+.vo-viewer [data-close] {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: #fff;
+}
+.vo-note {
+  position: absolute;
+  bottom: 16px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  opacity: 0.7;
 }
