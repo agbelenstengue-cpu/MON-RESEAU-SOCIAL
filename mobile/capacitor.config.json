@@ -2,14 +2,6 @@
   "appId": "com.mic.interconnected",
   "appName": "MIC",
   "webDir": "www",
-  "server": {
-    "androidScheme": "http",
-    "cleartext": true,
-    "allowNavigation": ["*"]
-  },
-  "android": {
-    "allowMixedContent": true
-  },
   "plugins": {
     "SystemBars": {
       "insetsHandling": "native",

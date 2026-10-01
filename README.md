@@ -60,8 +60,12 @@ l'onglet **Releases** du dépôt :
 Au premier lancement, les comptes de démonstration ci-dessus sont créés. Les
 données (base, photos, vocaux) restent sur l'ordinateur, dans
 `%APPDATA%\MIC\data`. Par défaut, le serveur n'écoute que sur cet ordinateur
-(127.0.0.1) ; le menu **Android → Partager sur le réseau local** l'ouvre aux
-téléphones du même Wi-Fi (voir ci-dessous). L'application n'est pas signée :
+(127.0.0.1) ; le menu **Partage → Partager sur le réseau local** l'ouvre aux
+navigateurs des appareils du même Wi-Fi (adresse affichée, par exemple
+`http://192.168.1.10:37238`, aussi dans le titre de la fenêtre) : tout le monde
+s'écrit alors en temps réel sur le MIC de ce PC. Partagez seulement sur un
+réseau de confiance (le code de connexion s'affiche sur l'appareil qui le
+demande). L'application n'est pas signée :
 Windows SmartScreen demande une confirmation (« Informations complémentaires »
 → « Exécuter quand même »).
 
@@ -75,23 +79,25 @@ npm run desktop:win   # construire le .exe (sous Windows)
 Le workflow « Applications MIC » construit aussi `MIC-<version>.apk` (Android 7.0
 et plus récent) et le publie dans la même version des **Releases**.
 
-Le serveur MIC ne tourne pas sur le téléphone : l'application Android
-(Capacitor, dossier `mobile/`) s'ouvre sur un écran « Adresse du serveur MIC »,
-retient l'adresse, puis affiche MIC en plein écran. Pour l'essayer avec le PC :
+Comme l'application Windows, l'APK fonctionne **seul dans le téléphone**, sans
+serveur ni adresse à saisir. Le code du serveur MIC (`server/`, le même que sur
+PC) est regroupé avec l'interface et tourne dans l'application (Capacitor,
+dossier `mobile/`) :
 
-1. Sur le PC, dans l'application MIC pour Windows : menu **Android → Partager
-   sur le réseau local** (accepter le pare-feu Windows pour les réseaux privés).
-   L'adresse s'affiche, par exemple `http://192.168.1.10:37238`, et reste dans
-   le titre de la fenêtre.
-2. Sur le téléphone, connecté au même Wi-Fi : installer l'APK, l'ouvrir et
-   saisir cette adresse.
+- `mobile/src/backend.js` reçoit les appels `/api` et la connexion temps réel
+  `/ws` de l'interface, sans réseau ;
+- `mobile/src/shims/` remplace les modules Node : `node:sqlite` par SQLite en
+  WebAssembly (sql.js), Express, `ws`, `node:crypto`, les fichiers ;
+- la base est enregistrée sur le téléphone après chaque écriture (IndexedDB) ;
+  photos, vocaux et vidéos sont rangés dans le stockage de l'application et
+  servis par un service worker (`mobile/src/sw.js`) ;
+- les téléchargements (mes données, événement, clip) ouvrent le partage Android.
 
-Le PC et le téléphone partagent alors le même MIC : on peut s'écrire en temps
-réel entre les deux. Partagez seulement sur un réseau de confiance (le code de
-connexion s'affiche sur l'appareil qui le demande). En http sur le réseau local,
-Android n'autorise pas le micro ni la caméra : vocaux, appels et Clips filmés
-demandent un serveur MIC en **https** (hébergé en ligne), dont on saisit
-l'adresse de la même façon.
+Au premier lancement, les comptes de démonstration sont créés. Le micro et la
+caméra fonctionnent (vocaux, Clips, photos). Comme sur PC, chaque appareil a son
+propre MIC : pour essayer une discussion, déconnectez-vous puis connectez-vous
+avec un autre compte de démonstration. Les appels demandent que les deux
+personnes soient connectées en même temps au même MIC.
 
 La clé de signature `mobile/keystore/mic-sideload.jks` est publique : elle sert
 seulement à installer les nouvelles versions par-dessus les anciennes. Pour le
@@ -101,7 +107,8 @@ Play Store, il faudra une clé secrète (variables `MIC_KEYSTORE`,
 ```bash
 cd mobile
 npm install
-npm run build:apk     # nécessite le SDK Android et Java 21
+npm run build:www     # regroupe public/ et server/ dans www/
+npm run build:apk     # APK : nécessite en plus le SDK Android et Java 21
 ```
 
 Variables d'environnement : `PORT` (3000), `HOST`, `MIC_DB` (chemin de la base,

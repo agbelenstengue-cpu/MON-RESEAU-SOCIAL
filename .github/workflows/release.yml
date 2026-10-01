@@ -44,6 +44,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
+      - name: Regrouper l'interface et le serveur MIC
+        run: node scripts/build-www.mjs
       - run: npx cap sync android
       - name: Construire l'APK
         working-directory: mobile/android
@@ -96,8 +98,7 @@ jobs:
             - `MIC-${{ steps.version.outputs.version }}.apk` : téléchargez-le sur le téléphone, ouvrez-le et autorisez
               l'installation depuis cette source si Android le demande.
 
-            L'application Android se connecte à un serveur MIC. Le plus simple : sur le PC, dans l'application MIC pour
-            Windows, menu **Android → Partager sur le réseau local**, puis saisissez sur le téléphone l'adresse affichée
-            (par exemple `http://192.168.1.10:37238`). Le téléphone doit être sur le même Wi-Fi que le PC.
-            Sur le réseau local (http), le micro et la caméra du téléphone ne sont pas disponibles : les vocaux, les appels
-            et les Clips filmés demandent un serveur en https.
+            Comme sur PC, MIC fonctionne tout seul dans le téléphone, sans serveur ni adresse à saisir : au premier
+            lancement, les comptes de démonstration sont créés (code de vérification affiché à l'écran), et les messages,
+            vocaux, photos, stories, Clips, canaux, communautés et événements sont enregistrés sur le téléphone.
+            Les fichiers à télécharger (mes données, événement, clip) s'ouvrent dans le partage Android.

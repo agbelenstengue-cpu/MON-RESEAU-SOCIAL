@@ -1,7 +1,7 @@
 // Application de bureau MIC (Windows, macOS, Linux) : le serveur MIC tourne dans
 // le processus principal d'Electron, sur cet ordinateur uniquement (127.0.0.1),
-// et l'interface s'ouvre dans une fenêtre dédiée. Sur demande (menu « Android »),
-// il est aussi partagé sur le réseau local pour l'application Android.
+// et l'interface s'ouvre dans une fenêtre dédiée. Sur demande (menu « Partage »),
+// il est aussi ouvert aux navigateurs des appareils du réseau local.
 import { app, BrowserWindow, Menu, shell, dialog } from 'electron';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -34,7 +34,7 @@ function writeSettings(patch) {
   fs.writeFileSync(settingsFile(), JSON.stringify({ ...readSettings(), ...patch }, null, 2));
 }
 
-// ---------- Partage sur le réseau local (application Android) ----------
+// ---------- Partage sur le réseau local (navigateurs des autres appareils) ----------
 function lanAddresses() {
   const out = [];
   for (const list of Object.values(os.networkInterfaces())) {
@@ -67,7 +67,7 @@ function stopLan() {
 function updateTitle() {
   if (!win) return;
   const [first] = lanAddresses();
-  win.setTitle(lanServer && first ? `MIC — Android : ${first}` : 'MIC');
+  win.setTitle(lanServer && first ? `MIC — partagé : ${first}` : 'MIC');
 }
 
 function showLanAddress() {
@@ -77,16 +77,16 @@ function showLanAddress() {
       type: 'info',
       title: 'MIC',
       message: 'Le partage sur le réseau local est désactivé.',
-      detail: 'Activez « Partager sur le réseau local » dans le menu Android, puis saisissez l’adresse affichée dans l’application MIC du téléphone.',
+      detail: 'Activez « Partager sur le réseau local » dans le menu Partage, puis ouvrez l’adresse affichée dans le navigateur d’un téléphone ou d’un autre ordinateur.',
     });
     return;
   }
   dialog.showMessageBox(win, {
     type: 'info',
     title: 'MIC',
-    message: addresses.length ? 'Adresse à saisir dans l’application Android :' : 'Aucun réseau détecté.',
+    message: addresses.length ? 'Adresse à ouvrir dans le navigateur des autres appareils :' : 'Aucun réseau détecté.',
     detail: addresses.length
-      ? `${addresses.join('\n')}\n\nLe téléphone doit être connecté au même réseau Wi-Fi que ce PC. Si Windows demande l’autorisation du pare-feu, acceptez pour les réseaux privés.\n\nSur le réseau local (http), le micro et la caméra du téléphone ne sont pas disponibles : les vocaux, les appels et les Clips filmés demandent un serveur en https.`
+      ? `${addresses.join('\n')}\n\nLes appareils doivent être connectés au même réseau Wi-Fi que ce PC. Si Windows demande l’autorisation du pare-feu, acceptez pour les réseaux privés.\n\nTout le monde partage alors le MIC de ce PC : messages en temps réel entre les appareils. Dans un navigateur, le micro et la caméra ne sont autorisés qu’en https : les vocaux, les appels et les Clips filmés restent réservés à ce PC.`
       : 'Connectez ce PC à un réseau Wi-Fi ou filaire.',
   });
 }
@@ -125,10 +125,10 @@ function buildMenu() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
-        label: 'Android',
+        label: 'Partage',
         submenu: [
           { label: 'Partager sur le réseau local', type: 'checkbox', checked: !!lanServer, click: (item) => setLan(item.checked) },
-          { label: 'Adresse pour l’application Android…', click: showLanAddress },
+          { label: 'Adresse à ouvrir sur les autres appareils…', click: showLanAddress },
         ],
       },
       {
@@ -170,7 +170,13 @@ async function startServer() {
   process.env.MIC_DB = dbFile;
 
   // Premier lancement : comptes de démonstration pour découvrir MIC tout de suite.
-  if (!fs.existsSync(dbFile)) await import('../server/seed.js');
+  if (!fs.existsSync(dbFile)) {
+    const { openDatabase } = await import('../server/db.js');
+    const { seedDemo } = await import('../server/demo.js');
+    const db = openDatabase(dbFile);
+    seedDemo(db);
+    db.close();
+  }
 
   const { createServer } = await import('../server/app.js');
   const { server } = createServer({ dbFile, uploadsDir: path.join(dataDir, 'uploads'), devOtp: true });
@@ -223,7 +229,7 @@ function createWindow() {
     }
   });
 
-  // Le titre de la fenêtre affiche l'adresse pour Android quand le partage est actif.
+  // Le titre de la fenêtre affiche l'adresse de partage quand il est actif.
   win.on('page-title-updated', (event) => event.preventDefault());
   win.webContents.on('did-finish-load', updateTitle);
 
