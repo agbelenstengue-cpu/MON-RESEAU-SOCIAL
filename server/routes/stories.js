@@ -69,6 +69,7 @@ export default function storyRoutes(api, { db, social, views, hub, saveMedia, Ht
     const b = req.body ?? {};
     if (!AUDIENCES.includes(b.audience)) throw new HttpError(400, 'invalid_audience');
     if (b.audience === 'world' && !req.user.world_enabled) throw new HttpError(403, 'world_presence_required');
+    if (b.audience === 'world' && req.user.restricted_until > Date.now()) throw new HttpError(403, 'account_restricted');
     const kind = b.kind === 'image' ? 'image' : 'text';
     const body = String(b.body ?? '').slice(0, 500);
     if (kind === 'text' && !body.trim()) throw new HttpError(400, 'empty_story');

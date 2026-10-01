@@ -261,6 +261,15 @@ const ADDED_COLUMNS = [
   ['messages', 'view_once', 'INTEGER NOT NULL DEFAULT 0'], // vue unique (8.9)
   ['conversations', 'message_timer', 'INTEGER NOT NULL DEFAULT 0'],
   ['users', 'privacy', 'TEXT'], // réglages de confidentialité (20.2), JSON
+  ['users', 'role', "TEXT NOT NULL DEFAULT 'user'"], // user | moderator
+  ['users', 'restricted_until', 'INTEGER'], // 22.5
+  ['users', 'suspended_until', 'INTEGER'],
+  ['users', 'banned', 'INTEGER NOT NULL DEFAULT 0'],
+  ['reports', 'details', 'TEXT'],
+  ['reports', 'decision', 'TEXT'],
+  ['reports', 'decided_by', 'INTEGER'],
+  ['reports', 'decided_at', 'INTEGER'],
+  ['reports', 'note', 'TEXT'],
   ['posts', 'video', 'TEXT'], // MIC Clips (14.2)
   ['posts', 'duration', 'INTEGER'],
   ['posts', 'allow_download', 'INTEGER NOT NULL DEFAULT 1'],
@@ -276,6 +285,18 @@ function migrate(db) {
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     opened_at INTEGER NOT NULL,
     PRIMARY KEY (message_id, user_id)
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS strikes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    report_id INTEGER,
+    reason TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    appeal_status TEXT NOT NULL DEFAULT 'none', -- none | pending | upheld | overturned
+    appeal_text TEXT,
+    appealed_at INTEGER,
+    appeal_decided_by INTEGER
   )`);
   // Vidéos téléversées : appartiennent à leur auteur jusqu'à leur publication.
   db.exec(`CREATE TABLE IF NOT EXISTS video_uploads (

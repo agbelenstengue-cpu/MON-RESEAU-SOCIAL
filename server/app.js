@@ -14,6 +14,7 @@ import chatRoutes from './routes/chats.js';
 import storyRoutes from './routes/stories.js';
 import worldRoutes from './routes/world.js';
 import callRoutes from './routes/calls.js';
+import moderationRoutes from './routes/moderation.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -54,6 +55,13 @@ export function createServer({
     const header = req.get('authorization') || '';
     const user = authenticate(header.startsWith('Bearer ') ? header.slice(7) : null);
     if (!user) return next(new HttpError(401, 'unauthorized'));
+    // Sanctions (22.5) : un compte banni n'a plus accès ; un compte suspendu ne peut
+    // que consulter son statut, faire appel et se déconnecter.
+    if (user.banned) return next(new HttpError(403, 'account_banned'));
+    if (user.suspended_until > Date.now()) {
+      const allowed = ['GET /me', 'GET /me/status', 'POST /auth/logout'].includes(`${req.method} ${req.path}`) || /^\/me\/strikes\/\d+\/appeal$/.test(req.path);
+      if (!allowed) return next(new HttpError(403, 'account_suspended'));
+    }
     req.user = user;
     req.token = header.slice(7);
     next();
@@ -93,7 +101,16 @@ export function createServer({
     if (name) fs.rm(path.join(uploadsDir, name), { force: true }, () => {});
   };
 
-  const ctx = { db, social, views, hub, notify, saveMedia, deleteMedia, uploadsDir, HttpError, devOtp, authenticate };
+  // Restriction temporaire (22.5) : ni publication, ni commentaire, ni message aux inconnus.
+  const assertNotRestricted = (user) => {
+    if (user.restricted_until > Date.now()) throw new HttpError(403, 'account_restricted');
+  };
+
+  // Modérateurs désignés par configuration (liste de @username).
+  const mods = (process.env.MIC_MODERATORS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  if (mods.length) db.prepare(`UPDATE users SET role = 'moderator' WHERE username IN (${mods.map(() => '?').join(',')})`).run(...mods);
+
+  const ctx = { assertNotRestricted, moderators: mods, db, social, views, hub, notify, saveMedia, deleteMedia, uploadsDir, HttpError, devOtp, authenticate };
 
   const api = express.Router();
   accountRoutes(api, ctx, requireAuth);
@@ -101,6 +118,7 @@ export function createServer({
   peopleRoutes(api, ctx);
   chatRoutes(api, ctx);
   callRoutes(api, ctx);
+  moderationRoutes(api, ctx);
   storyRoutes(api, ctx);
   worldRoutes(api, ctx);
   api.use((req, res, next) => next(new HttpError(404, 'not_found')));

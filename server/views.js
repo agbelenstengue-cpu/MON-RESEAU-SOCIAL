@@ -65,6 +65,9 @@ export function makeViews(db, social, hub) {
         },
         firstPublicDone: !!u.first_public_done,
         isMinor: isMinor(u),
+        role: u.role || 'user',
+        restrictedUntil: u.restricted_until > Date.now() ? u.restricted_until : null,
+        suspendedUntil: u.suspended_until > Date.now() ? u.suspended_until : null,
         createdAt: u.created_at,
       };
     },

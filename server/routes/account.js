@@ -14,7 +14,7 @@ export function normalizePhone(raw) {
   return /^\+[1-9]\d{7,14}$/.test(digits) ? digits : null;
 }
 
-export default function accountRoutes(api, { db, views, hub, saveMedia, HttpError, devOtp }, requireAuth) {
+export default function accountRoutes(api, { db, views, hub, saveMedia, HttpError, devOtp, moderators = [] }, requireAuth) {
   const tickets = new Map(); // ticket d'inscription -> { phone, expires }
 
   const q = {
@@ -74,6 +74,7 @@ export default function accountRoutes(api, { db, views, hub, saveMedia, HttpErro
     }
     q.clearOtps.run(phone);
     const user = q.userByPhone.get(phone);
+    if (user?.banned) throw new HttpError(403, 'account_banned');
     if (user) return res.json({ token: newSession(user.id), user: views.selfAccount(user) });
     const ticket = crypto.randomBytes(24).toString('hex');
     tickets.set(ticket, { phone, expires: now() + 30 * 60 * 1000 });
@@ -109,6 +110,7 @@ export default function accountRoutes(api, { db, views, hub, saveMedia, HttpErro
     const lang = LANGUAGES.includes(language) ? language : 'en';
     const info = q.insertUser.run(t.phone, handle, name, birthDate, lang, String(country || 'CM').slice(0, 2), world, now());
     tickets.delete(ticket);
+    if (moderators.includes(handle)) db.prepare("UPDATE users SET role = 'moderator' WHERE id = ?").run(Number(info.lastInsertRowid));
     const user = q.user.get(Number(info.lastInsertRowid));
     res.status(201).json({ token: newSession(user.id), user: views.selfAccount(user) });
   });

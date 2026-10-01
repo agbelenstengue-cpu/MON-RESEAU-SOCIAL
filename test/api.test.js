@@ -223,8 +223,10 @@ test('blocage et compte World privé', async () => {
   assert.equal((await call('GET', '/users/pauline', undefined, a.token)).data.relationship.following, 'active');
 
   // Signalement.
-  assert.equal((await call('POST', '/reports', { targetType: 'post', targetId: post.id, reason: 'spam' }, b.token)).status, 201);
-  assert.equal((await call('POST', '/reports', { targetType: 'post', targetId: post.id, reason: 'nope' }, b.token)).status, 400);
+  // Signalement : seulement ce que l'on peut voir (la personne bloquée ne voit plus la publication).
+  assert.equal((await call('POST', '/reports', { targetType: 'post', targetId: post.id, reason: 'spam' }, b.token)).status, 404);
+  assert.equal((await call('POST', '/reports', { targetType: 'user', targetId: b.user.id, reason: 'harassment' }, a.token)).status, 201);
+  assert.equal((await call('POST', '/reports', { targetType: 'user', targetId: b.user.id, reason: 'nope' }, a.token)).status, 400);
 });
 
 test('deux visages : nom privé pour les amis, nom public pour les autres', async () => {

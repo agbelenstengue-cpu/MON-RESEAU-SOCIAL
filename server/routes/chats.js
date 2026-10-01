@@ -159,6 +159,7 @@ export default function chatRoutes(api, ctx) {
     if (existing) return res.json(convSummary(q.conv.get(existing.id), req.user.id));
     const friends = social.isFriend(other.id, req.user.id);
     if (!friends && ageFromBirthDate(other.birth_date) < 18) throw new HttpError(403, 'cannot_message_minor');
+    if (!friends) ctx.assertNotRestricted(req.user);
     // Réglage « Who can message me » (20.2).
     if (!friends && social.privacy(other).whoCanMessage === 'friends') throw new HttpError(403, 'cannot_message');
     const id = tx(db, () => {

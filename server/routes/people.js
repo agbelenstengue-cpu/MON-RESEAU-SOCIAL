@@ -2,8 +2,6 @@
 import { now } from '../social.js';
 import { tx } from '../db.js';
 
-const REPORT_REASONS = ['spam', 'harassment', 'hate', 'violence', 'nudity', 'minor_safety', 'scam', 'impersonation', 'false_info', 'other'];
-const REPORT_TARGETS = ['user', 'post', 'comment', 'message', 'story'];
 
 export default function peopleRoutes(api, { db, social, views, hub, notify, HttpError }) {
   const q = {
@@ -35,7 +33,6 @@ export default function peopleRoutes(api, { db, social, views, hub, notify, Http
     block: db.prepare('INSERT OR IGNORE INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, ?)'),
     unblock: db.prepare('DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?'),
     blocked: db.prepare('SELECT u.* FROM blocks b JOIN users u ON u.id = b.blocked_id WHERE b.blocker_id = ?'),
-    report: db.prepare('INSERT INTO reports (reporter_id, target_type, target_id, reason, created_at) VALUES (?, ?, ?, ?, ?)'),
     notifs: db.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 100'),
     readNotifs: db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ?'),
     unread: db.prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read = 0'),
@@ -252,15 +249,6 @@ export default function peopleRoutes(api, { db, social, views, hub, notify, Http
 
   api.get('/blocked', (req, res) => {
     res.json(q.blocked.all(req.user.id).map((u) => views.userCard(u, req.user.id)));
-  });
-
-  // --- Signalement (22.2) ---
-  api.post('/reports', (req, res) => {
-    const { targetType, targetId, reason } = req.body ?? {};
-    if (!REPORT_TARGETS.includes(targetType)) throw new HttpError(400, 'invalid_target');
-    if (!REPORT_REASONS.includes(reason)) throw new HttpError(400, 'invalid_reason');
-    q.report.run(req.user.id, targetType, Number(targetId), reason, now());
-    res.status(201).json({ reported: true });
   });
 
   // --- Notifications (19) ---

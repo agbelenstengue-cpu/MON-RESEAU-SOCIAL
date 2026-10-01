@@ -7,6 +7,9 @@ import path from 'node:path';
 import { WebSocket } from 'ws';
 import { createServer } from '../server/app.js';
 
+// Comptes modérateurs des tests (désignés par configuration, comme en production).
+process.env.MIC_MODERATORS = 'modone,modtwo';
+
 export const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 export const ctx = { base: '' };
 let server;

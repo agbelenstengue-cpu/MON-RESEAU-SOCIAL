@@ -30,6 +30,8 @@ tx(db, () => {
   for (const [phone, username, name, birth, world, publicName, bio] of PEOPLE) {
     ids[username] = Number(insertUser.run(phone, username, name, birth, world, publicName, bio, now - 30 * 24 * H, now - 2 * H, world).lastInsertRowid);
   }
+  // Compte de démonstration modérateur (console de modération).
+  db.prepare("UPDATE users SET role = 'moderator' WHERE id = ?").run(ids.angele);
   const friend = db.prepare('INSERT INTO friendships (user_id, friend_id, created_at) VALUES (?, ?, ?)');
   const befriend = (a, b) => {
     friend.run(ids[a], ids[b], now);
@@ -95,5 +97,5 @@ tx(db, () => {
 });
 
 console.log('Comptes de démonstration créés. Connectez-vous avec l’un de ces numéros :');
-for (const [phone, username, name] of PEOPLE) console.log(`  ${phone}  @${username}  (${name})`);
+for (const [phone, username, name] of PEOPLE) console.log(`  ${phone}  @${username}  (${name})${username === 'angele' ? ' — modératrice' : ''}`);
 console.log('Le code de vérification s’affiche à l’écran en mode développement.');

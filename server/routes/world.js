@@ -120,6 +120,7 @@ export default function worldRoutes(api, ctx) {
   // --- Publication (14.3, 14.4) ; clip si une vidéo est jointe (14.2) ---
   api.post('/posts', (req, res) => {
     requireWorld(req.user);
+    ctx.assertNotRestricted(req.user);
     const b = req.body ?? {};
     const body = String(b.body ?? '').slice(0, MAX_POST);
     let video = null;
@@ -319,6 +320,7 @@ export default function worldRoutes(api, ctx) {
   api.post('/posts/:id/comments', (req, res) => {
     const p = visiblePost(req.params.id, req.user.id);
     requireWorld(req.user); // commenter publiquement demande une présence World (4.2)
+    ctx.assertNotRestricted(req.user);
     if (!social.canComment(req.user.id, p)) throw new HttpError(403, 'comments_restricted');
     const body = String(req.body?.body ?? '').trim().slice(0, MAX_COMMENT);
     if (!body) throw new HttpError(400, 'empty_comment');
