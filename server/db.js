@@ -255,9 +255,26 @@ export function openDatabase(file) {
 }
 
 // Colonnes ajoutées après la première version : mise à niveau des bases existantes.
+const ADDED_COLUMNS = [
+  ['messages', 'meta', 'TEXT'],
+  ['messages', 'expires_at', 'INTEGER'], // messages éphémères (8.8)
+  ['messages', 'view_once', 'INTEGER NOT NULL DEFAULT 0'], // vue unique (8.9)
+  ['conversations', 'message_timer', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'privacy', 'TEXT'], // réglages de confidentialité (20.2), JSON
+];
+
 function migrate(db) {
-  const cols = db.prepare('PRAGMA table_info(messages)').all().map((c) => c.name);
-  if (!cols.includes('meta')) db.exec('ALTER TABLE messages ADD COLUMN meta TEXT');
+  for (const [table, column, type] of ADDED_COLUMNS) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+    if (!cols.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+  }
+  db.exec(`CREATE TABLE IF NOT EXISTS message_opens (
+    message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    opened_at INTEGER NOT NULL,
+    PRIMARY KEY (message_id, user_id)
+  )`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_messages_expires ON messages(expires_at) WHERE expires_at IS NOT NULL');
 }
 
 // Petite aide pour exécuter plusieurs écritures de façon atomique.

@@ -73,7 +73,8 @@ export default function peopleRoutes(api, { db, social, views, hub, notify, Http
 
   api.get('/users/suggestions', (req, res) => {
     const me = req.user.id;
-    const rows = q.suggestions.all(me, me, me, me, me);
+    // Réglage « Suggest my account to others » (20.2).
+    const rows = q.suggestions.all(me, me, me, me, me).filter((r) => social.privacy(r.id).suggestAccount);
     res.json(rows.map((r) => ({ ...views.userCard(r.id, me), mutual: r.mutual })));
   });
 
@@ -91,7 +92,7 @@ export default function peopleRoutes(api, { db, social, views, hub, notify, Http
     const posts = canSeeWorld ? q.userPosts.all(u.id).filter((p) => social.canViewPost(me, p, u)) : [];
     res.json({
       ...views.userCard(u, me),
-      about: intimate ? u.about : undefined,
+      about: social.allowsFor(u.id, 'about', me) ? u.about : undefined,
       bio: u.world_enabled ? u.bio : '',
       worldPrivate: !!u.world_private,
       relationship: rel,

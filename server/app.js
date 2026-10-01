@@ -88,7 +88,12 @@ export function createServer({
     return `/uploads/${name}`;
   };
 
-  const ctx = { db, social, views, hub, notify, saveMedia, HttpError, devOtp, authenticate };
+  const deleteMedia = (url) => {
+    const name = /^\/uploads\/([a-f0-9]{32}\.\w+)$/.exec(String(url || ''))?.[1];
+    if (name) fs.rm(path.join(uploadsDir, name), { force: true }, () => {});
+  };
+
+  const ctx = { db, social, views, hub, notify, saveMedia, deleteMedia, HttpError, devOtp, authenticate };
 
   const api = express.Router();
   accountRoutes(api, ctx, requireAuth);

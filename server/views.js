@@ -15,6 +15,7 @@ export function makeViews(db, social, hub) {
     reactions: db.prepare('SELECT user_id, emoji FROM message_reactions WHERE message_id = ?'),
     msg: db.prepare('SELECT * FROM messages WHERE id = ?'),
     plays: db.prepare('SELECT user_id FROM voice_plays WHERE message_id = ?'),
+    opens: db.prepare('SELECT user_id FROM message_opens WHERE message_id = ?'),
     post: db.prepare('SELECT * FROM posts WHERE id = ?'),
   };
 
@@ -24,11 +25,14 @@ export function makeViews(db, social, hub) {
       if (typeof u === 'number') u = q.user.get(u);
       if (!u) return null;
       const intimate = u.id === viewerId || social.isFriend(u.id, viewerId);
+      // Photo privée selon le réglage « Private profile photo » ; sinon photo World.
+      const privatePhoto = social.allowsFor(u.id, 'profilePhoto', viewerId) ? u.avatar : null;
+      const publicPhoto = u.world_enabled ? u.public_avatar : null;
       const card = {
         id: u.id,
         username: u.username,
         name: intimate ? u.display_name : u.public_name || u.display_name,
-        avatar: intimate ? u.avatar : u.public_avatar || u.avatar,
+        avatar: intimate ? privatePhoto || publicPhoto : publicPhoto || privatePhoto,
         world: !!u.world_enabled,
       };
       if (social.canSeePresence(viewerId, u.id)) {
@@ -90,10 +94,13 @@ export function makeViews(db, social, hub) {
 
     // Statut d'un message envoyé (8.3) : sent → delivered → read, calculé sur
     // l'ensemble des autres membres actifs.
+    // Accusés de lecture (20.2) : réciproques ; un membre qui les a coupés ne
+    // fait jamais passer un message en « lu », et ne voit pas les « lu » des autres.
     messageStatus(m, members) {
       const others = members.filter((mb) => mb.user_id !== m.sender_id && mb.status === 'active');
       if (!others.length) return 'sent';
-      if (others.every((mb) => mb.last_read_id >= m.id)) return 'read';
+      const receipts = (id) => social.privacy(id)?.readReceipts !== false;
+      if (receipts(m.sender_id) && others.every((mb) => mb.last_read_id >= m.id && receipts(mb.user_id))) return 'read';
       if (others.every((mb) => mb.last_delivered_id >= m.id)) return 'delivered';
       return 'sent';
     },
@@ -113,6 +120,17 @@ export function makeViews(db, social, hub) {
         reactions: q.reactions.all(m.id).map((r) => ({ userId: r.user_id, emoji: r.emoji })),
       };
       if (m.sender_id === viewerId && members) out.status = views.messageStatus(m, members);
+      if (m.expires_at) out.expiresAt = m.expires_at;
+      // Vue unique : le fichier n'est jamais listé, il s'obtient une fois via /open.
+      if (m.view_once) {
+        out.viewOnce = true;
+        out.media = null;
+        const opened = new Set(q.opens.all(m.id).map((r) => r.user_id));
+        if (m.sender_id === viewerId) {
+          const others = (members || []).filter((mb) => mb.user_id !== m.sender_id);
+          out.opened = others.length > 0 && others.every((mb) => opened.has(mb.user_id));
+        } else out.opened = opened.has(viewerId);
+      }
       if (m.meta && !m.deleted) {
         try {
           out.meta = JSON.parse(m.meta);

@@ -76,7 +76,11 @@ export default function worldRoutes(api, ctx) {
   const notifyMentions = (body, actorId, postId) => {
     for (const name of extractMentions(body)) {
       const u = q.byName.get(name);
-      if (u) notify(u.id, actorId, 'mention', postId);
+      if (!u) continue;
+      // Réglage « Who can mention me » (20.2).
+      const level = social.privacy(u).whoCanMention;
+      if (level === 'nobody' || (level === 'following' && !social.isFollower(u.id, actorId))) continue;
+      notify(u.id, actorId, 'mention', postId);
     }
   };
 

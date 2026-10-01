@@ -1,3 +1,4 @@
+import { getPrivacy, allows } from './privacy.js';
 // Règles du graphe social et de visibilité (sections 6, 12, 14 du cahier).
 // Toutes les décisions « qui peut voir quoi » passent par ce module.
 
@@ -116,9 +117,23 @@ export function makeSocial(db) {
       }
     },
 
-    // Section 6.2 : qui voit « en ligne » / « vu à » (amis seulement par défaut).
+    privacy: (userOrId) => getPrivacy(typeof userOrId === 'number' ? q.user.get(userOrId) : userOrId),
+
+    // « everyone / friends / nobody » d'un réglage de `ownerId`, vu par `viewerId`.
+    allowsFor(ownerId, setting, viewerId) {
+      if (ownerId === viewerId) return true;
+      const owner = q.user.get(ownerId);
+      if (!owner) return false;
+      return allows(getPrivacy(owner)[setting], { friend: social.isFriend(ownerId, viewerId) });
+    },
+
+    // 6.2 et 20.2 : « vu à » et « en ligne » selon le réglage Last seen.
+    // Réciproque : qui masque son « vu à » ne voit pas celui des autres.
     canSeePresence(viewerId, targetId) {
-      return viewerId === targetId || social.isFriend(targetId, viewerId);
+      if (viewerId === targetId) return true;
+      const viewer = q.user.get(viewerId);
+      if (viewer && getPrivacy(viewer).lastSeen === 'nobody') return false;
+      return social.allowsFor(targetId, 'lastSeen', viewerId);
     },
   };
   return social;

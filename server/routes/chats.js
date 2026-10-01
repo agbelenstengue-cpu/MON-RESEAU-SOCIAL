@@ -1,6 +1,7 @@
 // Section 8 (messagerie) et 11 (groupes) + présence temps réel (8.4).
 import { now, ageFromBirthDate } from '../social.js';
 import { tx } from '../db.js';
+import { TIMERS } from '../privacy.js';
 
 const EDIT_WINDOW = 15 * 60 * 1000; // 8.5
 const DELETE_WINDOW = 48 * 3600 * 1000; // 8.5
@@ -33,10 +34,19 @@ export default function chatRoutes(api, ctx) {
     removeMember: db.prepare('DELETE FROM conversation_members WHERE conversation_id = ? AND user_id = ?'),
     setStatus: db.prepare('UPDATE conversation_members SET status = ? WHERE conversation_id = ? AND user_id = ?'),
     setRole: db.prepare('UPDATE conversation_members SET role = ? WHERE conversation_id = ? AND user_id = ?'),
-    lastMsg: db.prepare('SELECT * FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 1'),
+    // Les messages éphémères expirés ne sont jamais renvoyés (8.8).
+    lastMsg: db.prepare('SELECT * FROM messages WHERE conversation_id = ? AND (expires_at IS NULL OR expires_at > ?) ORDER BY id DESC LIMIT 1'),
     unread: db.prepare(`SELECT COUNT(*) AS n FROM messages
-      WHERE conversation_id = ? AND id > ? AND (sender_id IS NULL OR sender_id != ?) AND deleted = 0`),
-    page: db.prepare('SELECT * FROM messages WHERE conversation_id = ? AND id < ? ORDER BY id DESC LIMIT ?'),
+      WHERE conversation_id = ? AND id > ? AND (sender_id IS NULL OR sender_id != ?) AND deleted = 0
+      AND (expires_at IS NULL OR expires_at > ?)`),
+    page: db.prepare('SELECT * FROM messages WHERE conversation_id = ? AND id < ? AND (expires_at IS NULL OR expires_at > ?) ORDER BY id DESC LIMIT ?'),
+    setEphemeral: db.prepare('UPDATE messages SET expires_at = ?, view_once = ? WHERE id = ?'),
+    setTimer: db.prepare('UPDATE conversations SET message_timer = ? WHERE id = ?'),
+    expired: db.prepare('SELECT id, conversation_id, media FROM messages WHERE expires_at IS NOT NULL AND expires_at <= ?'),
+    purge: db.prepare('DELETE FROM messages WHERE id = ?'),
+    open: db.prepare('INSERT OR IGNORE INTO message_opens (message_id, user_id, opened_at) VALUES (?, ?, ?)'),
+    opens: db.prepare('SELECT user_id FROM message_opens WHERE message_id = ?'),
+    clearMedia: db.prepare('UPDATE messages SET media = NULL WHERE id = ?'),
     msg: db.prepare('SELECT * FROM messages WHERE id = ?'),
     insertMsg: db.prepare(`INSERT INTO messages (conversation_id, sender_id, kind, body, media, post_id, reply_to, created_at, meta)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`),
@@ -68,7 +78,7 @@ export default function chatRoutes(api, ctx) {
   const convSummary = (c, viewerId) => {
     const members = q.members.all(c.id);
     const me = members.find((m) => m.user_id === viewerId);
-    const last = q.lastMsg.get(c.id);
+    const last = q.lastMsg.get(c.id, now());
     const others = members.filter((m) => m.user_id !== viewerId);
     const out = {
       id: c.id,
@@ -77,7 +87,8 @@ export default function chatRoutes(api, ctx) {
       announceOnly: !!c.announce_only,
       status: me.status,
       role: me.role,
-      unread: q.unread.get(c.id, me.last_read_id, viewerId).n,
+      unread: q.unread.get(c.id, me.last_read_id, viewerId, now()).n,
+      messageTimer: c.message_timer || 0,
       lastMessage: last ? views.message(last, viewerId, members) : null,
       updatedAt: last?.created_at ?? c.created_at,
       memberCount: members.length,
@@ -122,6 +133,8 @@ export default function chatRoutes(api, ctx) {
   // « écrit… » (8.4) : relayé aux autres membres, jamais stocké.
   hub.on('message', (userId, msg) => {
     if (msg?.type !== 'typing') return;
+    // Indicateur d'écriture désactivé (20.2) : rien n'est envoyé.
+    if (social.privacy(userId).typingIndicator === false) return;
     const activity = msg.activity === 'recording' ? 'recording' : 'typing';
     const convId = Number(msg.conversationId);
     const me = q.member.get(convId, userId);
@@ -146,8 +159,12 @@ export default function chatRoutes(api, ctx) {
     if (existing) return res.json(convSummary(q.conv.get(existing.id), req.user.id));
     const friends = social.isFriend(other.id, req.user.id);
     if (!friends && ageFromBirthDate(other.birth_date) < 18) throw new HttpError(403, 'cannot_message_minor');
+    // Réglage « Who can message me » (20.2).
+    if (!friends && social.privacy(other).whoCanMessage === 'friends') throw new HttpError(403, 'cannot_message');
     const id = tx(db, () => {
       const convId = Number(q.insertConv.run('direct', null, req.user.id, now()).lastInsertRowid);
+      // Minuteur par défaut de la personne qui ouvre la discussion (« Default message timer »).
+      q.setTimer.run(social.privacy(req.user).defaultTimer, convId);
       q.insertMember.run(convId, req.user.id, 'member', 'active', now());
       q.insertMember.run(convId, other.id, 'member', friends ? 'active' : 'request', now());
       return convId;
@@ -165,6 +182,7 @@ export default function chatRoutes(api, ctx) {
     for (const id of ids) if (!social.isFriend(req.user.id, id)) throw new HttpError(403, 'not_friend');
     const convId = tx(db, () => {
       const cid = Number(q.insertConv.run('group', title, req.user.id, now()).lastInsertRowid);
+      q.setTimer.run(social.privacy(req.user).defaultTimer, cid);
       q.insertMember.run(cid, req.user.id, 'admin', 'active', now());
       for (const id of ids) q.insertMember.run(cid, id, 'member', 'active', now());
       q.insertMsg.run(cid, req.user.id, 'system', 'group_created', null, null, null, now(), null);
@@ -245,7 +263,7 @@ export default function chatRoutes(api, ctx) {
     const before = Number(req.query.before) || Number.MAX_SAFE_INTEGER;
     const limit = Math.min(Number(req.query.limit) || 50, 100);
     const members = q.members.all(conv.id);
-    const rows = q.page.all(conv.id, before, limit).reverse();
+    const rows = q.page.all(conv.id, before, now(), limit).reverse();
     res.json(rows.map((m) => views.message(m, req.user.id, members)));
   });
 
@@ -257,6 +275,57 @@ export default function chatRoutes(api, ctx) {
       hub.send(mb.user_id, type, views.message(m, mb.user_id, members));
     }
   };
+
+  // Minuteur de la discussion appliqué aux nouveaux messages (8.8).
+  const ephemeral = (conv, mid, viewOnce) => {
+    const timer = q.conv.get(conv.id).message_timer;
+    if (timer || viewOnce) q.setEphemeral.run(timer ? now() + timer : null, viewOnce ? 1 : 0, mid);
+  };
+
+  api.put('/conversations/:id/timer', (req, res) => {
+    const { conv, me } = membership(req.params.id, req.user.id);
+    const timer = Number(req.body?.timer);
+    if (!TIMERS.includes(timer)) throw new HttpError(400, 'invalid_timer');
+    if (conv.type === 'group' && me.role !== 'admin') throw new HttpError(403, 'admin_only');
+    if (me.status !== 'active') throw new HttpError(403, 'conversation_closed');
+    q.setTimer.run(timer, conv.id);
+    const mid = Number(q.insertMsg.run(conv.id, req.user.id, 'system', 'timer_set', null, null, null, now(), JSON.stringify({ timer })).lastInsertRowid);
+    pushMessage(conv.id, mid);
+    hub.sendMany(memberIds(conv.id), 'conversation:update', { id: conv.id });
+    res.json(convSummary(q.conv.get(conv.id), req.user.id));
+  });
+
+  // Ouvrir un contenu en vue unique : une seule fois, puis le fichier est effacé
+  // quand tous les destinataires l'ont ouvert (8.9).
+  api.post('/messages/:id/open', (req, res) => {
+    const { m, me } = ownMessage(req);
+    if (!m.view_once || m.deleted) throw new HttpError(400, 'not_view_once');
+    if (m.sender_id === req.user.id) throw new HttpError(403, 'cannot_open_own');
+    if (me.status !== 'active' || q.opens.all(m.id).some((r) => r.user_id === req.user.id)) throw new HttpError(410, 'already_opened');
+    const media = m.media;
+    q.open.run(m.id, req.user.id, now());
+    if (m.kind === 'voice') q.play.run(m.id, req.user.id, now());
+    const opened = new Set(q.opens.all(m.id).map((r) => r.user_id));
+    const recipients = q.members.all(m.conversation_id).filter((mb) => mb.user_id !== m.sender_id);
+    if (recipients.every((mb) => opened.has(mb.user_id))) {
+      q.clearMedia.run(m.id);
+      // Le fichier est supprimé un peu plus tard, le temps que l'ouverture se termine.
+      setTimeout(() => ctx.deleteMedia(media), 5 * 60 * 1000).unref?.();
+    }
+    pushMessage(m.conversation_id, m.id, 'message:update');
+    res.json({ media });
+  });
+
+  // Purge des messages éphémères expirés et de leurs fichiers.
+  const purgeExpired = () => {
+    for (const m of q.expired.all(now())) {
+      q.purge.run(m.id);
+      if (m.media) ctx.deleteMedia(m.media);
+      hub.sendMany(memberIds(m.conversation_id), 'message:expired', { id: m.id, conversationId: m.conversation_id });
+    }
+  };
+  setInterval(purgeExpired, 30 * 1000).unref();
+  ctx.purgeExpired = purgeExpired;
 
   api.post('/conversations/:id/messages', (req, res) => {
     const { conv, me } = membership(req.params.id, req.user.id);
@@ -272,6 +341,8 @@ export default function chatRoutes(api, ctx) {
     }
     let meta = null;
     if (kind === 'voice') meta = JSON.stringify(voiceMeta(b));
+    // Vue unique (8.9) : photos et vocaux seulement.
+    const viewOnce = kind !== 'text' && !!b.viewOnce;
     const media = kind === 'text' ? null : saveMedia(b.media, kind === 'voice' ? 'audio' : 'image');
     if (kind !== 'text' && !media) throw new HttpError(400, 'invalid_media');
     let replyTo = null;
@@ -283,6 +354,7 @@ export default function chatRoutes(api, ctx) {
       // Répondre à une demande de message vaut acceptation.
       if (me.status === 'request') q.setStatus.run('active', conv.id, req.user.id);
       const mid = Number(q.insertMsg.run(conv.id, req.user.id, kind, body, media, null, replyTo, now(), meta).lastInsertRowid);
+      ephemeral(conv, mid, viewOnce);
       q.markRead.run(mid, mid, conv.id, req.user.id);
       // Les destinataires connectés reçoivent immédiatement : « distribué ».
       for (const mb of q.members.all(conv.id)) {
@@ -304,6 +376,7 @@ export default function chatRoutes(api, ctx) {
       if (!other || social.isBlockedEither(userId, other.user_id)) throw new HttpError(403, 'blocked');
     }
     const mid = Number(q.insertMsg.run(conv.id, userId, 'post', String(body).slice(0, MAX_BODY), null, postId, null, now(), null).lastInsertRowid);
+    ephemeral(conv, mid, false);
     q.markRead.run(mid, mid, conv.id, userId);
     pushMessage(conv.id, mid);
     return mid;

@@ -55,7 +55,8 @@ export default function callRoutes(api, ctx) {
   // (réglage par défaut « My contacts »).
   const canRing = (callerId, calleeId, conv) => {
     if (social.isBlockedEither(callerId, calleeId)) return false;
-    if (conv.type === 'direct') return social.isFriend(calleeId, callerId);
+    // Réglage « Who can call me » (20.2), « friends » par défaut.
+    if (conv.type === 'direct') return social.allowsFor(calleeId, 'whoCanCall', callerId);
     return true;
   };
 

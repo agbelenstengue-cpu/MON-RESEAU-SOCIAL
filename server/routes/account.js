@@ -1,6 +1,7 @@
 // Section 5 : inscription par numéro, OTP, identité, présence World, suppression.
 import crypto from 'node:crypto';
 import { USERNAME_RE, ageFromBirthDate, now } from '../social.js';
+import { getPrivacy, mergePrivacy, isMinor, MINOR_LOCKED, PRIVACY_OPTIONS } from '../privacy.js';
 
 const OTP_TTL = 10 * 60 * 1000;
 const OTP_MAX_PER_HOUR = 5;
@@ -170,6 +171,20 @@ export default function accountRoutes(api, { db, views, hub, saveMedia, HttpErro
     const priv = req.body?.private ? 1 : req.user.world_private;
     db.prepare('UPDATE users SET world_enabled = ?, world_private = ? WHERE id = ?').run(enable ? 1 : 0, priv, req.user.id);
     res.json(views.selfAccount(q.user.get(req.user.id)));
+  });
+
+  // 20.2 : réglages de confidentialité.
+  const privacyView = (u) => ({ settings: getPrivacy(u), options: PRIVACY_OPTIONS, locked: isMinor(u) ? MINOR_LOCKED : [] });
+  api.get('/me/privacy', requireAuth, (req, res) => res.json(privacyView(req.user)));
+  api.patch('/me/privacy', requireAuth, (req, res) => {
+    let merged;
+    try {
+      merged = mergePrivacy(req.user, req.body);
+    } catch (err) {
+      throw new HttpError(400, err.code || 'invalid_setting');
+    }
+    db.prepare('UPDATE users SET privacy = ? WHERE id = ?').run(JSON.stringify(merged), req.user.id);
+    res.json(privacyView(q.user.get(req.user.id)));
   });
 
   // 5.8 : suppression du compte (immédiate dans ce prototype).
