@@ -42,6 +42,8 @@ export function makeSocial(db) {
     iBlocked: db.prepare('SELECT 1 FROM blocks WHERE blocker_id = ? AND blocked_id = ?'),
     request: db.prepare('SELECT 1 FROM friend_requests WHERE from_id = ? AND to_id = ?'),
     user: db.prepare('SELECT * FROM users WHERE id = ?'),
+    community: db.prepare('SELECT * FROM communities WHERE id = ?'),
+    cmember: db.prepare("SELECT * FROM community_members WHERE community_id = ? AND user_id = ? AND status = 'active'"),
   };
 
   const social = {
@@ -90,6 +92,8 @@ export function makeSocial(db) {
       if (!post || post.deleted_at) return false;
       if (post.author_id === viewerId) return true;
       if (social.isBlockedEither(viewerId, post.author_id)) return false;
+      // Publication de communauté (18.1) : publique pour tous, sinon réservée aux membres.
+      if (post.community_id) return social.canSeeCommunityContent(viewerId, post.community_id);
       if (!author?.world_enabled) return false;
       switch (post.audience) {
         case 'everyone':
@@ -115,6 +119,13 @@ export function makeSocial(db) {
         default:
           return false;
       }
+    },
+
+    communityMember: (communityId, userId) => q.cmember.get(communityId, userId) || null,
+    canSeeCommunityContent(viewerId, communityId) {
+      const c = q.community.get(communityId);
+      if (!c) return false;
+      return c.type === 'public' || !!q.cmember.get(communityId, viewerId);
     },
 
     privacy: (userOrId) => getPrivacy(typeof userOrId === 'number' ? q.user.get(userOrId) : userOrId),

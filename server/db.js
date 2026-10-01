@@ -270,6 +270,7 @@ const ADDED_COLUMNS = [
   ['reports', 'decided_by', 'INTEGER'],
   ['reports', 'decided_at', 'INTEGER'],
   ['reports', 'note', 'TEXT'],
+  ['posts', 'community_id', 'INTEGER'], // publication de communauté (18.4)
   ['posts', 'video', 'TEXT'], // MIC Clips (14.2)
   ['posts', 'duration', 'INTEGER'],
   ['posts', 'allow_download', 'INTEGER NOT NULL DEFAULT 1'],
@@ -297,6 +298,60 @@ function migrate(db) {
     appeal_text TEXT,
     appealed_at INTEGER,
     appeal_decided_by INTEGER
+  )`);
+  // Communautés et événements (section 18).
+  db.exec(`CREATE TABLE IF NOT EXISTS communities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    handle TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT 'other',
+    type TEXT NOT NULL DEFAULT 'public', -- public | private | hidden
+    rules TEXT NOT NULL DEFAULT '[]',
+    avatar TEXT,
+    pinned_post_id INTEGER,
+    created_at INTEGER NOT NULL
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS community_members (
+    community_id INTEGER NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'member', -- owner | admin | moderator | member
+    status TEXT NOT NULL DEFAULT 'active', -- active | pending | invited
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (community_id, user_id)
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS community_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    community_id INTEGER NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
+    actor_id INTEGER,
+    action TEXT NOT NULL,
+    target TEXT,
+    created_at INTEGER NOT NULL
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    host_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    community_id INTEGER REFERENCES communities(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    starts_at INTEGER NOT NULL,
+    ends_at INTEGER,
+    timezone TEXT NOT NULL DEFAULT 'UTC',
+    location TEXT NOT NULL DEFAULT '',
+    online_url TEXT NOT NULL DEFAULT '',
+    visibility TEXT NOT NULL DEFAULT 'public', -- public | followers | friends | community
+    cover TEXT,
+    cancelled INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS event_rsvps (
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL, -- going | interested | cant
+    reminded TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (event_id, user_id)
   )`);
   // Vidéos téléversées : appartiennent à leur auteur jusqu'à leur publication.
   db.exec(`CREATE TABLE IF NOT EXISTS video_uploads (
