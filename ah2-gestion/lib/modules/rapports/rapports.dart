@@ -152,7 +152,7 @@ class Rapports {
     final avant = recettesParActivite(base, du: ajouterJours(date, -28), au: ajouterJours(date, -1));
     final seuil = base.paramInt('baisse_activite_pourcent');
     return [
-      for (final a in base.lignes("SELECT code, libelle FROM activites WHERE code NOT LIKE 'ADM%' ORDER BY code"))
+      for (final a in base.lignes("SELECT code, libelle FROM activites WHERE code NOT LIKE 'ADM%' AND actif=1 ORDER BY code"))
         () {
           final j = jour[a['code']] ?? 0;
           final moy = (avant[a['code']] ?? 0) / 28;
@@ -176,7 +176,7 @@ class Rapports {
     for (final c in base.lignes("SELECT * FROM tresoreries WHERE type='caisse' AND actif=1")) {
       final s = Tresorerie.solde(base, c['id'] as String);
       if (s > plafond) {
-        r.add({'niveau': 'orange', 'titre': 'Plafond de caisse dépassé', 'detail': '${c['libelle']} (${c['entite']}) : ${fcfa(s)} – proposer un versement en banque'});
+        r.add({'niveau': 'orange', 'titre': 'Plafond de caisse dépassé', 'detail': '${c['libelle']} (${c['entite']}) : ${fcfa(s)} : proposer un versement en banque'});
       }
       final hier = ajouterJours(aujourdhui, -1);
       final aTravaille = base.valeur('SELECT 1 FROM mouvements_tresorerie WHERE tresorerie=? AND date=?', [c['id'], hier]) != null;

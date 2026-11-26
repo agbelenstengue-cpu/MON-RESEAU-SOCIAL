@@ -1,4 +1,4 @@
-# Guides utilisateurs par rôle — AH2 Gestion
+# Guides utilisateurs par rôle, AH2 Gestion
 
 Chaque personne a **son propre identifiant**. Sur PC, on se connecte avec un mot de passe. Sur téléphone, on se connecte avec un code court. Toute action est tracée : qui, quand, sur quel appareil.
 
@@ -73,6 +73,13 @@ La liste de travail a trois onglets : *En cours*, *Sortis avec solde dû* et *Ar
 - **Rouvrir une journée** : faites la demande, avec motif, dans *Comptabilité › Clôtures*. La direction doit l'approuver.
 - **Dons et subventions** : enregistrez chaque don et remettez le reçu au donateur. Les conventions de subvention se suivent ligne par ligne (budget, réalisé, solde).
 - Valider le **plan comptable** dans *Paramétrage › Plan comptable*. Le centre de santé est en SYSCOHADA, l'ONG en SYCEBNL.
+
+**Paramétrage (sur le PC central) :** tout s'ajoute, se modifie et se retire, sans toucher au code.
+
+- **Structure et documents** : vous pouvez importer le logo, ou importer une entête toute faite (l'image de votre papier à en-tête, qui remplace alors l'entête générée). Vous pouvez aussi modifier les textes de l'entête et activer ou non le logo en filigrane (documents et écran).
+- **Services, actes et prix** : ajouter un service ou un acte, changer un prix (il s'applique à partir d'aujourd'hui, le passé ne change pas), renommer, retirer.
+- **Programmes de désintoxication**, **comptes de trésorerie** (banques, mobile money, caisses), **plan comptable**, **schémas d'écritures**, **seuils et délais**, **utilisateurs**.
+- Retirer un élément qui n'a jamais servi le supprime. Retirer un élément qui a déjà servi le **désactive** : il disparaît des listes de saisie, mais l'historique et la comptabilité restent intacts. On peut le réactiver.
 
 ## Direction, présidence, trésorerie
 

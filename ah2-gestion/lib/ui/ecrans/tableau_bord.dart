@@ -26,7 +26,7 @@ class EcranTableauBord extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     final larg = MediaQuery.sizeOf(context).width;
     return PageContenu(enfants: [
-      Text('Bonjour ${etat.session!.nom}, nous sommes le ${dateFr(b.maintenant)}',
+      Text('Situation au ${dateFr(b.maintenant)}',
           style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
       const SizedBox(height: 4),
       Text(rapport['note'] as String, style: t.bodyMedium?.copyWith(color: Theme.of(context).hintColor)),
@@ -125,7 +125,7 @@ class EcranTableauBord extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: a['niveau'] == 'rouge' ? Couleurs.alerteRougeFond : Couleurs.alerteOrangeFond,
                   border: Border.all(color: a['niveau'] == 'rouge' ? Couleurs.alerteRougeBord : Couleurs.alerteOrangeBord),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(a['titre']!, style: const TextStyle(fontWeight: FontWeight.w700, color: Couleurs.encre)),

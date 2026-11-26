@@ -99,8 +99,8 @@ class _EcranComptabiliteState extends State<EcranComptabilite> {
               trailing: Text('D ${fcfa(l['debit'] as int, unite: false)} · C ${fcfa(l['credit'] as int, unite: false)}'),
             ),
           ListTile(
-            title: const Text('Totaux', style: TextStyle(fontWeight: FontWeight.w800)),
-            trailing: Text('D ${fcfa(td, unite: false)} · C ${fcfa(tc, unite: false)}', style: const TextStyle(fontWeight: FontWeight.w800)),
+            title: const Text('Totaux', style: TextStyle(fontWeight: FontWeight.bold)),
+            trailing: Text('D ${fcfa(td, unite: false)} · C ${fcfa(tc, unite: false)}', style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ]),
       ),

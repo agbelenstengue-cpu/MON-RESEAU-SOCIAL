@@ -5,6 +5,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
@@ -17,16 +18,77 @@ import '../noyau/base.dart';
 import '../noyau/operations.dart';
 import '../noyau/outils.dart';
 
-const _vert = PdfColor.fromInt(0xFF0E6E5C);
-const _gris = PdfColor.fromInt(0xFFF0F3F1);
-const _bord = PdfColor.fromInt(0xFFC9D3CF);
-const _sombre = PdfColor.fromInt(0xFF0F2A24);
+// Présentation sobre : noir, gris, un seul trait de couleur institutionnelle.
+const _vert = PdfColor.fromInt(0xFF1F4D36);
+const _gris = PdfColor.fromInt(0xFFF2F2F2);
+const _bord = PdfColor.fromInt(0xFFBFBFBF);
+const _sombre = PdfColor.fromInt(0xFF2B2B2B);
 
 class Documents {
   static String _m(int v) => fcfa(v);
 
+  // ------------------------------------------------------------ police Arial
+  static Uint8List? _normale, _gras, _italique, _grasItalique;
+
+  /// Polices des documents. L'application fournit Arial (Windows) ou son
+  /// équivalent métrique libre Liberation Sans (Android), embarqué.
+  static void configurerPolices({required Uint8List normale, required Uint8List gras, Uint8List? italique, Uint8List? grasItalique}) {
+    _normale = normale;
+    _gras = gras;
+    _italique = italique ?? normale;
+    _grasItalique = grasItalique ?? gras;
+  }
+
+  static Uint8List? _lire(List<String> chemins) {
+    for (final c in chemins) {
+      final f = File(c);
+      if (f.existsSync()) return f.readAsBytesSync();
+    }
+    return null;
+  }
+
+  static void _chargerPolicesParDefaut() {
+    const win = r'C:\Windows\Fonts\';
+    final n = _lire(['${win}arial.ttf', 'assets/polices/LiberationSans-Regular.ttf']);
+    final g = _lire(['${win}arialbd.ttf', 'assets/polices/LiberationSans-Bold.ttf']);
+    if (n == null || g == null) return;
+    configurerPolices(
+      normale: n,
+      gras: g,
+      italique: _lire(['${win}ariali.ttf', 'assets/polices/LiberationSans-Italic.ttf']),
+      grasItalique: _lire(['${win}arialbi.ttf', 'assets/polices/LiberationSans-BoldItalic.ttf']),
+    );
+  }
+
+  static pw.ThemeData _theme() {
+    if (_normale == null) _chargerPolicesParDefaut();
+    if (_normale == null) return pw.ThemeData.base();
+    pw.Font f(Uint8List o) => pw.Font.ttf(ByteData.sublistView(o));
+    return pw.ThemeData.withFont(base: f(_normale!), bold: f(_gras!), italic: f(_italique!), boldItalic: f(_grasItalique!));
+  }
+
+  /// Page A4 avec, si l'option est active, le logo de la structure en filigrane.
+  static pw.PageTheme _page(Base base, String entite, {pw.EdgeInsets marge = const pw.EdgeInsets.fromLTRB(36, 32, 36, 24)}) {
+    final e = base.ligne('SELECT logo, filigrane FROM entites WHERE code=?', [entite]);
+    final logo = e?['logo'] as Uint8List?;
+    final filigrane = logo != null && e?['filigrane'] == 1;
+    return pw.PageTheme(
+      pageFormat: PdfPageFormat.a4,
+      margin: marge,
+      theme: _theme(),
+      buildBackground: filigrane
+          ? (c) => pw.FullPage(
+                ignoreMargins: true,
+                child: pw.Center(child: pw.Opacity(opacity: 0.07, child: pw.Image(pw.MemoryImage(logo), width: 360))),
+              )
+          : null,
+    );
+  }
+
   static pw.Widget _entete(Base base, String entite, {bool compact = false}) {
     final e = base.ligne('SELECT * FROM entites WHERE code=?', [entite])!;
+    final logo = e['logo'] as Uint8List?;
+    final entete = e['entete'] as Uint8List?;
     final lignes = [
       if ((e['adresse'] as String).isNotEmpty) e['adresse'] as String,
       if ((e['contacts'] as String).isNotEmpty) e['contacts'] as String,
@@ -34,26 +96,32 @@ class Documents {
     ];
     if (compact) {
       return pw.Column(children: [
+        if (logo != null) pw.Image(pw.MemoryImage(logo), height: 42),
         pw.Text(e['nom'] as String, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10), textAlign: pw.TextAlign.center),
         for (final l in lignes) pw.Text(l, style: const pw.TextStyle(fontSize: 7), textAlign: pw.TextAlign.center),
         pw.Divider(thickness: 0.5),
       ]);
     }
+    // Entête importée (papier à en-tête de la structure) : utilisée telle quelle.
+    if (entete != null) {
+      return pw.Container(
+        padding: const pw.EdgeInsets.only(bottom: 6),
+        decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: _sombre, width: 0.8))),
+        child: pw.Image(pw.MemoryImage(entete), height: 90, fit: pw.BoxFit.contain),
+      );
+    }
     return pw.Container(
-      padding: const pw.EdgeInsets.only(bottom: 10),
-      decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: _vert, width: 2))),
-      child: pw.Row(children: [
-        pw.Container(
-          width: 44,
-          height: 44,
-          alignment: pw.Alignment.center,
-          decoration: pw.BoxDecoration(color: _vert, borderRadius: pw.BorderRadius.circular(8)),
-          child: pw.Text(e['sigle'] as String, style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 9)),
-        ),
-        pw.SizedBox(width: 12),
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: _vert, width: 1.2))),
+      child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
+        if (logo != null) ...[
+          pw.Image(pw.MemoryImage(logo), width: 58, height: 58, fit: pw.BoxFit.contain),
+          pw.SizedBox(width: 14),
+        ],
         pw.Expanded(
           child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Text(e['nom'] as String, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 13)),
+            pw.Text((e['nom'] as String).toUpperCase(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12.5)),
+            if ((e['sigle'] as String).isNotEmpty) pw.Text(e['sigle'] as String, style: const pw.TextStyle(fontSize: 9.5)),
             for (final l in lignes) pw.Text(l, style: const pw.TextStyle(fontSize: 9)),
           ]),
         ),
@@ -174,8 +242,7 @@ class Documents {
     }
     final petit = const pw.TextStyle(fontSize: 8);
     doc.addPage(pw.Page(
-      pageFormat: PdfPageFormat.roll80,
-      margin: const pw.EdgeInsets.all(8),
+      pageTheme: pw.PageTheme(pageFormat: PdfPageFormat.roll80, margin: const pw.EdgeInsets.all(8), theme: _theme()),
       build: (c) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
         _entete(base, op.entite, compact: true),
         pw.Text(titre, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
@@ -225,8 +292,7 @@ class Documents {
     final genere = DateTime.parse(r['genere_le'] as String);
     final doc = pw.Document(title: numero);
     doc.addPage(pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.fromLTRB(32, 32, 32, 24),
+      pageTheme: _page(base, entite, marge: const pw.EdgeInsets.fromLTRB(32, 32, 32, 24)),
       header: (c) => c.pageNumber == 1 ? _entete(base, entite) : pw.SizedBox(),
       footer: (c) => _pied(c, numero),
       build: (c) => [
@@ -326,8 +392,7 @@ class Documents {
           pw.Expanded(child: pw.Text(b, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
         ]));
     doc.addPage(pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.fromLTRB(36, 32, 36, 24),
+      pageTheme: _page(base, 'CS', marge: const pw.EdgeInsets.fromLTRB(36, 32, 36, 24)),
       header: (c) => c.pageNumber == 1 ? _entete(base, 'CS') : pw.SizedBox(),
       footer: (c) => _pied(c, d['numero'] as String),
       build: (c) => [
@@ -341,8 +406,8 @@ class Documents {
         ligne('Programme', r['programme'] as String),
         ligne("Date d'entrée", dateFr(depuisIso(r['date_entree'] as String))),
         ligne('Date de sortie', sortie == null ? 'En cours' : dateFr(depuisIso(sortie))),
-        ligne('Durée effective', r['duree_effective'] == null ? '—' : '${r['duree_effective']} jours'),
-        ligne('Motif de sortie', Desintox.libellesMotifs[r['motif_sortie']] ?? '—'),
+        ligne('Durée effective', r['duree_effective'] == null ? 'Non renseigné' : '${r['duree_effective']} jours'),
+        ligne('Motif de sortie', Desintox.libellesMotifs[r['motif_sortie']] ?? ''),
         ligne('Montant total', _m(r['montant_total'] as int)),
         pw.SizedBox(height: 12),
         _tableau(['Date', 'N° de reçu', 'Payé par', 'Mode', 'Montant'], [
@@ -380,8 +445,7 @@ class Documents {
     final numero = 'RFJ-${date.replaceAll('-', '')}';
     final doc = pw.Document(title: 'Rapport financier du ${dateFr(depuisIso(date))}');
     doc.addPage(pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.fromLTRB(36, 32, 36, 24),
+      pageTheme: _page(base, 'CS', marge: const pw.EdgeInsets.fromLTRB(36, 32, 36, 24)),
       header: (c) => c.pageNumber == 1 ? _entete(base, 'CS') : pw.SizedBox(),
       footer: (c) => _pied(c, numero),
       build: (c) => [
@@ -429,8 +493,7 @@ class Documents {
     final bill = Map<String, Object?>.from(jsonDecode(a['billetage'] as String) as Map);
     final doc = pw.Document(title: a['piece'] as String);
     doc.addPage(pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.fromLTRB(36, 32, 36, 24),
+      pageTheme: _page(base, t['entite'] as String, marge: const pw.EdgeInsets.fromLTRB(36, 32, 36, 24)),
       build: (c) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
         _entete(base, t['entite'] as String),
         pw.SizedBox(height: 12),

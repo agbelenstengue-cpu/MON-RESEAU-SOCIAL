@@ -49,7 +49,7 @@ class _EcranRelevesState extends State<EcranReleves> {
               icon: const Icon(Icons.fact_check_outlined),
               label: const Text('Générer tous les services'),
             ),
-            for (final a in b.lignes('SELECT code, libelle FROM activites WHERE service=1 ORDER BY code'))
+            for (final a in b.lignes('SELECT code, libelle FROM activites WHERE service=1 AND actif=1 ORDER BY code'))
               ActionChip(
                 label: Text(a['libelle'] as String),
                 onPressed: () => executer(context, () => Releves.generer(s, activite: a['code'] as String, date: dateIso(date)),

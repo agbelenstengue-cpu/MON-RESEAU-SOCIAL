@@ -3,6 +3,7 @@
 library;
 
 import 'dart:math';
+import 'dart:typed_data';
 
 import '../modules/actes/actes.dart';
 import '../modules/desintox/desintox.dart';
@@ -20,9 +21,9 @@ class Demo {
 
   /// Installe un PC central avec des utilisateurs et deux téléphones.
   /// Renvoie les clés de synchronisation des téléphones.
-  static Map<String, String> installerCentral(Base b) {
+  static Map<String, String> installerCentral(Base b, {Uint8List? logo}) {
     initialiserModules();
-    Parametrage.installerPcCentral(b, motDePasseAdmin: motDePasse);
+    Parametrage.installerPcCentral(b, motDePasseAdmin: motDePasse, logo: logo);
     final admin = Session.pour(b, 'admin');
     for (final u in [
       ['comptable', 'M. Ekotto', 'comptable', null],

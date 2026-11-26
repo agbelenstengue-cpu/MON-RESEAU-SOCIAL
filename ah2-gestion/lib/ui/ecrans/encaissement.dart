@@ -1,5 +1,5 @@
-/// Encaissement (maquette « Encaissement ») : patient → service → actes →
-/// mode de paiement → reçu. Trois gestes pour une opération courante.
+/// Encaissement (maquette « Encaissement ») : patient vers service vers actes  vers 
+/// mode de paiement vers reçu. Trois gestes pour une opération courante.
 library;
 
 import 'package:material_ui/material_ui.dart';
@@ -39,7 +39,7 @@ class _EcranEncaissementState extends State<EcranEncaissement> {
     final s = etat.session!;
     if (_fait != null) return _confirmation(context, _fait!);
     final services = b
-        .lignes("SELECT a.code, a.libelle FROM activites a WHERE a.service=1 AND EXISTS "
+        .lignes("SELECT a.code, a.libelle FROM activites a WHERE a.service=1 AND a.actif=1 AND EXISTS "
             "(SELECT 1 FROM actes_catalogue c WHERE c.activite=a.code AND c.actif=1) ORDER BY a.code")
         .where((a) => s.role != 'agent' || s.activite == null || s.activite == a['code'])
         .toList();
@@ -110,7 +110,7 @@ class _EcranEncaissementState extends State<EcranEncaissement> {
                       value: _actes.contains(c['code']),
                       onChanged: (v) => setState(() => v! ? _actes.add(c['code'] as String) : _actes.remove(c['code'])),
                       tileColor: Theme.of(context).colorScheme.surface,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       controlAffinity: ListTileControlAffinity.leading,
                       title: Text(c['libelle'] as String, style: const TextStyle(fontWeight: FontWeight.w500)),
                       secondary: Text(fcfa(Parametrage.tarif(b, c['code'] as String, aujourdhui)),
@@ -172,7 +172,7 @@ class _EcranEncaissementState extends State<EcranEncaissement> {
                     fit: FlexFit.loose,
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                       Text('Total à encaisser', style: TextStyle(color: Theme.of(context).hintColor)),
-                      Text(fcfa(total), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+                      Text(fcfa(total), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                     ]),
                   ),
                   const SizedBox(width: 12, height: 8),

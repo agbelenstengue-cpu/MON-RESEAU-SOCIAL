@@ -72,7 +72,7 @@ class _EcranSynchroState extends State<EcranSynchro> {
     return PageContenu(largeurMax: 640, enfants: [
       Carte(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(s.libelle(b.maintenant), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+          Text(s.libelle(b.maintenant), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
           const SizedBox(height: 6),
           Text('Opérations en attente d’envoi : ${s.enAttente}'),
           Text('Dernière synchronisation : ${s.derniere == null ? 'jamais' : '${dateFr(s.derniere!)} à ${heureFr(s.derniere!)}'}'),

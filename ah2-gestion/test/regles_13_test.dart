@@ -1,4 +1,4 @@
-/// Critères de recette du cahier des charges (§13) — un groupe par règle.
+/// Critères de recette du cahier des charges (§13), un groupe par règle.
 library;
 
 import 'dart:io';
@@ -235,7 +235,7 @@ void main() {
       expect(Rapports.recettesParActivite(b, du: '2026-01-01', au: '2026-12-31').values.reduce((a, c) => a + c), rec);
       expect(Tresorerie.solde(b, 'CS-BQ'), 2000);
       expect(Moteur.solde(b, 'CS', '5851'), 0);
-      // Arrêté : on compte 500 FCFA au lieu de 1 000 → manquant de 500 enregistré.
+      // Arrêté : on compte 500 FCFA au lieu de 1 000 vers manquant de 500 enregistré.
       expect(() => Tresorerie.arreterCaisse(s, caisse: 'CS-CAISSE', billetage: {500: 1}), throwsA(isA<RegleMetier>()));
       final arr = Tresorerie.arreterCaisse(s, caisse: 'CS-CAISSE', billetage: {500: 1}, motifEcart: 'Erreur de rendu');
       expect(arr.d<int>('ecart'), -500);
@@ -354,7 +354,7 @@ void main() {
   });
 
   group('§13.6 Désintoxication', () {
-    test('total versé = somme des versements ; reste = total − versé ; reçu', () {
+    test('total versé = somme des versements ; reste = total - versé ; reçu', () {
       final env = Environnement();
       final s = env.sessionCentrale('caisse');
       final p = patient(s, 'MBARGA');

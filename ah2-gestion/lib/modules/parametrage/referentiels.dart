@@ -1,8 +1,8 @@
 /// Données de paramétrage livrées par défaut, À VALIDER PAR LE COMPTABLE.
 ///
 /// Deux comptabilités distinctes :
-///  * CS  — Centre de santé : plan SYSCOHADA révisé ;
-///  * ONG — A Hand to Humanity : plan SYCEBNL (dons, subventions, programmes).
+///  * CS , Centre de santé : plan SYSCOHADA révisé ;
+///  * ONG, A Hand to Humanity : plan SYCEBNL (dons, subventions, programmes).
 /// Les numéros sont indicatifs (§6.15, §15) : tout est modifiable dans le
 /// paramétrage, rien n'est codé en dur dans les modules.
 library;
@@ -21,12 +21,12 @@ const entitesDefaut = [
 /// Comptes communs aux deux entités (numérotation OHADA).
 const _communs = [
   CompteDefaut('4011', 'Fournisseurs'),
-  CompteDefaut('4221', 'Personnel – rémunérations dues'),
-  CompteDefaut('4311', 'Sécurité sociale – CNPS'),
-  CompteDefaut('4471', 'État – impôts retenus à la source'),
-  CompteDefaut('5211', 'Banque – compte courant'),
-  CompteDefaut('5521', 'Monnaie électronique – MTN Mobile Money'),
-  CompteDefaut('5522', 'Monnaie électronique – Orange Money'),
+  CompteDefaut('4221', 'Personnel, rémunérations dues'),
+  CompteDefaut('4311', 'Sécurité sociale (CNPS)'),
+  CompteDefaut('4471', 'État, impôts retenus à la source'),
+  CompteDefaut('5211', 'Banque, compte courant'),
+  CompteDefaut('5521', 'Monnaie électronique MTN Mobile Money'),
+  CompteDefaut('5522', 'Monnaie électronique Orange Money'),
   CompteDefaut('5711', 'Caisse centrale'),
   CompteDefaut('5851', 'Virements de fonds internes'),
   CompteDefaut('6051', 'Eau'),
@@ -41,38 +41,38 @@ const _communs = [
   CompteDefaut('6311', 'Frais bancaires'),
   CompteDefaut('6588', 'Charges diverses (dont manquants de caisse)'),
   CompteDefaut('6611', 'Appointements, salaires et indemnités'),
-  CompteDefaut('6641', 'Charges sociales – CNPS'),
+  CompteDefaut('6641', 'Charges sociales (CNPS)'),
   CompteDefaut('7588', 'Produits divers (dont excédents de caisse)'),
 ];
 
-/// Centre de santé — SYSCOHADA révisé.
+/// Centre de santé, SYSCOHADA révisé.
 const comptesCS = [
   ..._communs,
-  CompteDefaut('4111', 'Clients – patients'),
-  CompteDefaut('4112', 'Clients – organismes de prise en charge'),
-  CompteDefaut('4191', 'Clients – avances et cautions reçues'),
-  CompteDefaut('4671', 'Compte de liaison – ONG AH2'),
+  CompteDefaut('4111', 'Clients patients'),
+  CompteDefaut('4112', 'Clients organismes de prise en charge'),
+  CompteDefaut('4191', 'Clients, avances et cautions reçues'),
+  CompteDefaut('4671', 'Compte de liaison ONG AH2'),
   CompteDefaut('4770', "Produits constatés d'avance"),
   CompteDefaut('6011', 'Achats de médicaments'),
   CompteDefaut('6031', 'Variation des stocks de marchandises'),
   CompteDefaut('6041', 'Achats de réactifs et consommables de laboratoire'),
-  CompteDefaut('7011', 'Ventes – pharmacie moderne'),
-  CompteDefaut('7012', 'Ventes – pharmacie traditionnelle'),
-  CompteDefaut('7061', 'Prestations – consultations'),
-  CompteDefaut('7062', 'Prestations – laboratoire'),
-  CompteDefaut('7063', 'Prestations – hospitalisation'),
-  CompteDefaut('7064', 'Prestations – désintoxication'),
-  CompteDefaut('7065', 'Prestations – massages et soins'),
+  CompteDefaut('7011', 'Ventes de la pharmacie moderne'),
+  CompteDefaut('7012', 'Ventes de la pharmacie traditionnelle'),
+  CompteDefaut('7061', 'Prestations de consultations'),
+  CompteDefaut('7062', 'Prestations de laboratoire'),
+  CompteDefaut('7063', "Prestations d'hospitalisation"),
+  CompteDefaut('7064', 'Prestations de désintoxication'),
+  CompteDefaut('7065', 'Prestations de massages et soins'),
 ];
 
-/// ONG — SYCEBNL. Les comptes de dons et subventions sont à confirmer par
+/// ONG, SYCEBNL. Les comptes de dons et subventions sont à confirmer par
 /// le comptable avec la nomenclature SYCEBNL en vigueur.
 const comptesONG = [
   ..._communs,
   CompteDefaut('3111', 'Stocks reçus en don (médicaments, fournitures)'),
-  CompteDefaut('4671', 'Compte de liaison – Centre de santé'),
+  CompteDefaut('4671', 'Compte de liaison Centre de santé'),
   CompteDefaut('6581', 'Aides et secours accordés (programmes sociaux)'),
-  CompteDefaut('7181', "Subventions d'exploitation – bailleurs"),
+  CompteDefaut('7181', "Subventions d'exploitation des bailleurs"),
   CompteDefaut('7581', 'Dons manuels en numéraire'),
   CompteDefaut('7582', 'Dons en nature'),
 ];
@@ -103,7 +103,7 @@ const activitesDefaut = [
   ['ADM_ONG', 'Administration générale (ONG)', 'ONG', 0, 'actes'],
 ];
 
-/// Catalogue de démonstration — tarifs FICTIFS à remplacer (§15).
+/// Catalogue de démonstration, tarifs FICTIFS à remplacer (§15).
 /// [code, libellé, activité, compte de produit, prix]
 const actesDefaut = [
   ['CONS-GEN', 'Consultation générale', 'CONS', '7061', 2000],
@@ -206,7 +206,8 @@ Map<String, Map<String, List<String>>> droitsDefaut() {
     },
     'comptable': {
       for (final m in tousModules) m: tout,
-      'utilisateurs': ['voir'],
+      // Le comptable gère aussi le personnel qui utilise le logiciel.
+      'utilisateurs': ['voir', 'creer'],
       'appareils': ['voir'],
       'sauvegardes': ['voir', 'creer'],
       'audit': ['voir'],

@@ -2,7 +2,7 @@
 ///
 /// Trois familles de tables :
 ///  * PARAMÉTRAGE : fait autorité sur le PC central, diffusé aux appareils ;
-///  * REGISTRES IMMUABLES : `operations`, `audit`, `ecritures`, `lignes_ecriture` —
+///  * REGISTRES IMMUABLES : `operations`, `audit`, `ecritures`, `lignes_ecriture` , 
 ///    des déclencheurs SQL interdisent toute modification ou suppression ;
 ///  * VUES MÉTIER DÉRIVÉES : calculées en appliquant les opérations (actes,
 ///    versements, mouvements de trésorerie…). Elles se reconstruisent à
@@ -25,7 +25,10 @@ CREATE TABLE entites (
   referentiel TEXT NOT NULL CHECK (referentiel IN ('SYSCOHADA','SYCEBNL')),
   adresse TEXT NOT NULL DEFAULT '',
   contacts TEXT NOT NULL DEFAULT '',
-  numeros_administratifs TEXT NOT NULL DEFAULT ''
+  numeros_administratifs TEXT NOT NULL DEFAULT '',
+  logo BLOB,                        -- PNG ou JPEG
+  entete BLOB,                      -- entête complète importée (image), remplace l'entête générée
+  filigrane INTEGER NOT NULL DEFAULT 1  -- logo en filigrane sur les documents et l'écran
 ) STRICT;
 
 CREATE TABLE comptes (
@@ -51,7 +54,8 @@ CREATE TABLE activites (
   libelle TEXT NOT NULL,
   entite TEXT NOT NULL REFERENCES entites(code),
   service INTEGER NOT NULL DEFAULT 0,   -- 1 = enregistre des actes (relevé journalier)
-  type_releve TEXT NOT NULL DEFAULT 'actes'  -- actes ou sorties (pharmacies)
+  type_releve TEXT NOT NULL DEFAULT 'actes',  -- actes ou sorties (pharmacies)
+  actif INTEGER NOT NULL DEFAULT 1
 ) STRICT;
 
 CREATE TABLE tresoreries (
@@ -90,7 +94,8 @@ CREATE TABLE programmes_desintox (
   duree_jours INTEGER NOT NULL,
   phases TEXT NOT NULL DEFAULT '',
   mode_calcul TEXT NOT NULL CHECK (mode_calcul IN ('forfait','journalier')),
-  montant INTEGER NOT NULL          -- forfait total, ou prix par jour
+  montant INTEGER NOT NULL,         -- forfait total, ou prix par jour
+  actif INTEGER NOT NULL DEFAULT 1
 ) STRICT;
 
 -- Schémas d'écritures automatiques, modifiables par le comptable.

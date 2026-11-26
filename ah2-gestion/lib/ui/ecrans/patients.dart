@@ -176,9 +176,9 @@ class FichePatient extends StatelessWidget {
         Carte(
           child: Wrap(spacing: 32, runSpacing: 12, children: [
             _info('Dossier', p['numero_dossier'] as String),
-            _info('Sexe', (p['sexe'] as String).isEmpty ? '—' : p['sexe'] as String),
-            _info('Contact', (p['contact'] as String).isEmpty ? '—' : p['contact'] as String),
-            _info('Personne à prévenir', (p['personne_a_prevenir'] as String).isEmpty ? '—' : p['personne_a_prevenir'] as String),
+            _info('Sexe', (p['sexe'] as String).isEmpty ? 'Non renseigné' : p['sexe'] as String),
+            _info('Contact', (p['contact'] as String).isEmpty ? 'Non renseigné' : p['contact'] as String),
+            _info('Personne à prévenir', (p['personne_a_prevenir'] as String).isEmpty ? 'Non renseigné' : p['personne_a_prevenir'] as String),
             _info('Créance', fcfa(creance)),
           ]),
         ),

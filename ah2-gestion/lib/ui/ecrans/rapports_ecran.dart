@@ -55,7 +55,7 @@ class _EcranRapportsState extends State<EcranRapports> {
             ListTile(dense: true, title: Text(l['libelle'] as String), trailing: Text('${fcfa(l['montant'] as int)} · ${l['pourcentage']} %')),
           ListTile(
             title: const Text('Total des recettes', style: TextStyle(fontWeight: FontWeight.w700)),
-            trailing: Text(fcfa(r['recettes'] as int), style: const TextStyle(fontWeight: FontWeight.w800)),
+            trailing: Text(fcfa(r['recettes'] as int), style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
           ListTile(dense: true, title: const Text('Charges'), trailing: Text(fcfa(r['charges'] as int))),
           ListTile(dense: true, title: const Text('Résultat du jour'), trailing: Text(fcfa(r['resultat'] as int))),

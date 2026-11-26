@@ -43,7 +43,7 @@ class Actes {
     return base.transaction(() {
       if (actes.isEmpty) throw const RegleMetier('Sélectionnez au moins un acte.');
       if (!Modes.tous.contains(mode)) throw RegleMetier('Mode de paiement inconnu : $mode');
-      final act = base.ligne('SELECT * FROM activites WHERE code=?', [activite]) ??
+      final act = base.ligne('SELECT * FROM activites WHERE code=? AND actif=1', [activite]) ??
           (throw RegleMetier('Service inconnu : $activite'));
       if (s.activite != null && s.role == 'agent' && s.activite != activite) {
         throw const DroitRefuse('Vous ne pouvez enregistrer que les actes de votre service.');
@@ -189,7 +189,7 @@ class _Acte extends TypeOperation {
       for (final l in lignes)
         LigneMontant(l['montant'] as int, variables: {'produit': l['compte_produit'] as String}, activite: activite)
     ];
-    final libelle = '${lignes.map((l) => l['libelle']).join(', ')}${op.piece != null ? ' – ${op.piece}' : ''}';
+    final libelle = '${lignes.map((l) => l['libelle']).join(', ')}${op.piece != null ? ' : ${op.piece}' : ''}';
     switch (mode) {
       case Modes.credit:
         Moteur.generer(base, op, 'prestation_credit', total: total, lignes: detail, tiers: patient, activite: activite, libelle: libelle);
@@ -240,7 +240,7 @@ class _Reglement extends TypeOperation {
         total: m,
         variables: {...Tresorerie.variables(base, treso), 'compte_tiers': op.d<String>('compte_tiers')},
         tiers: op.d('tiers'),
-        libelle: 'Règlement de créance – ${op.piece}');
+        libelle: 'Règlement de créance : ${op.piece}');
     Tresorerie.mouvement(base, op, treso, m, 'Règlement de créance', reference: op.d('reference'));
   }
 }

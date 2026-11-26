@@ -4,7 +4,7 @@ Les valeurs livrées sont des **valeurs de démonstration**. Elles se modifient 
 
 | Point | Décision | Où le régler |
 |---|---|---|
-| Statut juridique du centre de santé | ✅ **Deux comptabilités** : le centre de santé en SYSCOHADA révisé, l'ONG en SYCEBNL | — |
+| Statut juridique du centre de santé | ✅ **Deux comptabilités** : le centre de santé en SYSCOHADA révisé, l'ONG en SYCEBNL | |
 | Plan comptable | Pré-rempli : comptes SYSCOHADA (centre de santé), comptes de dons et subventions SYCEBNL (ONG, numéros 7181, 7581, 7582 et 3111 **à confirmer**) | Paramétrage › Plan comptable |
 | Comptes d'affectation de chaque opération | Schémas d'écritures livrés (§6.15) | Table des schémas d'écritures |
 | Actes et tarifs de chaque service | Tarifs fictifs (consultation 2 000, NFS 3 500…) | Paramétrage › Tarifs |
@@ -15,4 +15,4 @@ Les valeurs livrées sont des **valeurs de démonstration**. Elles se modifient 
 | Personnel | Par défaut, chaque entité emploie son personnel | Phase 3 (paie) |
 | Nombre de PC et de téléphones, PC central, Wi-Fi | À définir | Guide d'installation |
 | Charte visuelle (logo, couleurs) | Modèle par défaut sobre ; nom, adresse et contacts modifiables | Paramétrage › Structure |
-| Paramètres de paie (taux en vigueur) | Phase 3 | — |
+| Paramètres de paie (taux en vigueur) | Phase 3 | |

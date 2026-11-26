@@ -1,4 +1,4 @@
-# Guide d'installation — AH2 Gestion
+# Guide d'installation, AH2 Gestion
 
 ## 1. Ce qu'il faut
 

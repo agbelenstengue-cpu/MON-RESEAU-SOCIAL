@@ -3,7 +3,7 @@
 ///
 /// Règles garanties :
 ///  * total versé = somme des versements (non annulés) ;
-///  * reste à payer = montant total − total versé ;
+///  * reste à payer = montant total - total versé ;
 ///  * archivage automatique au délai paramétré, jamais si un solde est dû ;
 ///  * archiver n'efface rien : le dossier reste dans la comptabilité et les archives.
 library;
@@ -81,7 +81,7 @@ class Desintox {
       }
       final enCours = base.valeur('SELECT numero FROM desintox_dossiers WHERE patient=? AND date_sortie IS NULL', [patient]);
       if (enCours != null) throw RegleMetier('Ce patient a déjà un programme en cours ($enCours).');
-      final prog = base.ligne('SELECT * FROM programmes_desintox WHERE code=?', [programme]) ??
+      final prog = base.ligne('SELECT * FROM programmes_desintox WHERE code=? AND actif=1', [programme]) ??
           (throw RegleMetier('Programme inconnu : $programme'));
       final d = duree ?? prog['duree_jours'] as int;
       if (d <= 0) throw const RegleMetier('Durée invalide.');
@@ -367,7 +367,7 @@ class _Versement extends TypeOperation {
         variables: Tresorerie.variables(base, treso),
         tiers: op.d<String>('patient'),
         activite: 'DESINTOX',
-        libelle: 'Versement ${d?['numero'] ?? ''} – ${op.d('payeur')}');
+        libelle: 'Versement ${d?['numero'] ?? ''} : ${op.d('payeur')}');
     Tresorerie.mouvement(base, op, treso, m, 'Versement désintoxication ${d?['numero'] ?? ''}', reference: op.d('reference'));
     final verse = base.entier('SELECT COALESCE(SUM(montant),0) FROM desintox_versements WHERE dossier=? AND annule=0', [op.d('dossier')]);
     if (d != null && verse > (d['montant_total'] as int)) {

@@ -4,6 +4,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:ah2_gestion/demo/demonstration.dart';
 import 'package:ah2_gestion/modules/modules.dart';
@@ -42,7 +43,7 @@ class Environnement {
     initialiserModules();
     final h = Horloge(debut ?? DateTime(2026, 11, 2, 8, 0));
     final c = Base.ouvrir(appareil: 'PC1', horloge: h.call);
-    final cles = Demo.installerCentral(c);
+    final cles = Demo.installerCentral(c, logo: File('assets/images/logo_ah2.png').readAsBytesSync());
     return Environnement._(h, c, ServeurSync(c), cles);
   }
 

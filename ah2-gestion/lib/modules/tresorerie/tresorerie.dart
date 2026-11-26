@@ -284,7 +284,7 @@ class _Depense extends TypeOperation {
         variables: {...Tresorerie.variables(base, treso), 'charge': d['compte'] as String},
         activite: d['activite'] as String,
         subvention: d['subvention'] as String?,
-        libelle: '${d['motif']} – ${d['beneficiaire']}');
+        libelle: '${d['motif']} : ${d['beneficiaire']}');
     Tresorerie.mouvement(base, paiement, treso, -(d['montant'] as int), 'Dépense : ${d['motif']}',
         reference: d['piece'] as String?);
   }
@@ -355,7 +355,7 @@ class _Virement extends TypeOperation {
     final src = op.d<String>('source');
     final dst = op.d<String>('destination');
     final m = op.d<int>('montant');
-    final lib = 'Virement ${Tresorerie.compte(base, src)['libelle']} → ${Tresorerie.compte(base, dst)['libelle']}';
+    final lib = 'Virement ${Tresorerie.compte(base, src)['libelle']} vers ${Tresorerie.compte(base, dst)['libelle']}';
     Moteur.generer(base, op, 'virement_sortie',
         total: m, variables: Tresorerie.variables(base, src, prefixe: 'source'), libelle: lib, activite: null);
     Moteur.generer(base, op, 'virement_entree',

@@ -1,4 +1,4 @@
-/// Dons et subventions (§6.14) — comptabilité de l'ONG (SYCEBNL).
+/// Dons et subventions (§6.14), comptabilité de l'ONG (SYCEBNL).
 library;
 
 import 'dart:convert';
@@ -192,12 +192,12 @@ class _Don extends TypeOperation {
     final activite = op.d<String?>('affectation') ?? 'PROG';
     if (op.d('nature') == 'nature') {
       Moteur.generer(base, op, 'don_nature',
-          total: m, variables: {'compte_actif': op.d<String>('compte_actif')}, activite: activite, libelle: 'Don en nature – $nom');
+          total: m, variables: {'compte_actif': op.d<String>('compte_actif')}, activite: activite, libelle: 'Don en nature : $nom');
     } else {
       final treso = op.d<String>('tresorerie');
       Moteur.generer(base, op, 'don_numeraire',
-          total: m, variables: Tresorerie.variables(base, treso), activite: activite, libelle: 'Don – $nom');
-      Tresorerie.mouvement(base, op, treso, m, 'Don – $nom', reference: op.d('reference'));
+          total: m, variables: Tresorerie.variables(base, treso), activite: activite, libelle: 'Don : $nom');
+      Tresorerie.mouvement(base, op, treso, m, 'Don : $nom', reference: op.d('reference'));
     }
   }
 

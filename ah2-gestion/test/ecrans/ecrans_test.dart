@@ -16,11 +16,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 Future<void> _polices() async {
   final dossier = '${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/material_fonts';
-  final roboto = FontLoader('Roboto');
-  for (final f in ['Regular', 'Medium', 'Bold', 'Black', 'Italic']) {
-    roboto.addFont(Future.value(ByteData.sublistView(File('$dossier/Roboto-$f.ttf').readAsBytesSync())));
+  final arial = FontLoader('Arial');
+  for (final f in ['Regular', 'Bold', 'Italic', 'BoldItalic']) {
+    arial.addFont(Future.value(ByteData.sublistView(File('assets/polices/LiberationSans-$f.ttf').readAsBytesSync())));
   }
-  await roboto.load();
+  await arial.load();
   final icones = FontLoader('MaterialIcons')
     ..addFont(Future.value(ByteData.sublistView(File('$dossier/MaterialIcons-Regular.otf').readAsBytesSync())));
   await icones.load();
@@ -32,7 +32,7 @@ void main() {
   setUpAll(() async {
     await _polices();
     final b = Base.ouvrir(appareil: 'PC1');
-    Demo.installerCentral(b);
+    Demo.installerCentral(b, logo: File('assets/images/logo_ah2.png').readAsBytesSync());
     Demo.donneesFictives(b);
     etat = EtatApp()..ouvrir(b, null);
   });
@@ -63,6 +63,13 @@ void main() {
             await t.tap(bas.first);
           }
         }
+        await t.pumpAndSettle();
+        // Les images (logo, filigrane) se décodent de façon asynchrone.
+        await t.runAsync(() async {
+          for (final e in find.byType(Image).evaluate()) {
+            await precacheImage((e.widget as Image).image, e);
+          }
+        });
         await t.pumpAndSettle();
         expect(t.takeException(), isNull, reason: d.libelle);
         // Captures produites seulement à la demande : AH2_CAPTURES=1 flutter test --update-goldens

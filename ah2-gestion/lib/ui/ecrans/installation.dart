@@ -4,7 +4,7 @@ library;
 import 'package:material_ui/material_ui.dart';
 
 import '../../demo/demonstration.dart';
-import '../../main.dart' show enregistrerCodeAppareil;
+import '../../main.dart' show enregistrerCodeAppareil, logoParDefaut;
 import '../../modules/parametrage/parametrage.dart';
 import '../../noyau/outils.dart';
 import '../../sync/synchronisation.dart';
@@ -42,11 +42,12 @@ class _EcranInstallationState extends State<EcranInstallation> {
     try {
       await enregistrerCodeAppareil(code);
       etat.reouvrirAvecCode(code);
+      final logo = await logoParDefaut();
       if (_demo) {
-        Demo.installerCentral(etat.base!);
+        Demo.installerCentral(etat.base!, logo: logo);
         Demo.donneesFictives(etat.base!);
       } else {
-        Parametrage.installerPcCentral(etat.base!, motDePasseAdmin: _mdp.text);
+        Parametrage.installerPcCentral(etat.base!, motDePasseAdmin: _mdp.text, logo: logo);
       }
       await etat.demarrerServices();
       etat.rafraichir();
@@ -168,16 +169,10 @@ class LogoAh2 extends StatelessWidget {
   const LogoAh2({super.key});
   @override
   Widget build(BuildContext context) => Row(children: [
-        Container(
-          width: 48,
-          height: 48,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: Couleurs.primaire, borderRadius: BorderRadius.circular(14)),
-          child: const Text('AH2', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-        ),
-        const SizedBox(width: 12),
+        Image.asset('assets/images/logo_ah2.png', width: 64, height: 64),
+        const SizedBox(width: 14),
         const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('AH2 Gestion', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          Text('AH2 Gestion', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           Text('A Hand to Humanity', style: TextStyle(fontSize: 13)),
         ]),
       ]);

@@ -8,6 +8,7 @@ import '../../modules/desintox/desintox.dart';
 import '../../modules/patients/patients.dart';
 import '../etat_app.dart';
 import '../theme.dart';
+import '../widgets/logo.dart';
 import '../widgets/pdf_ui.dart';
 import 'caisse.dart';
 import 'comptabilite.dart';
@@ -59,7 +60,7 @@ final destinations = <Destination>[
   Destination('synchro', 'Synchronisation', Icons.sync, (e) => true, () => const EcranSynchro()),
 ];
 
-/// Permet à un écran d'en ouvrir un autre (ex. tableau de bord → désintox).
+/// Permet à un écran d'en ouvrir un autre (ex. tableau de bord vers désintox).
 class Navigation extends InheritedWidget {
   final void Function(String id) ouvrir;
   const Navigation({super.key, required this.ouvrir, required super.child});
@@ -87,7 +88,7 @@ class _CoquilleState extends State<Coquille> {
     final large = MediaQuery.sizeOf(context).width >= 900;
     final contenu = Navigation(
       ouvrir: _ouvrir,
-      child: KeyedSubtree(key: ValueKey(dest.id), child: dest.ecran()),
+      child: Filigrane(child: KeyedSubtree(key: ValueKey(dest.id), child: dest.ecran())),
     );
     final barre = AppBar(
       title: Text(dest.libelle, style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -227,11 +228,9 @@ class _BarreLaterale extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
             child: Row(children: [
               Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: Couleurs.primaire, borderRadius: BorderRadius.circular(10)),
-                child: const Text('AH2', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
+                child: const LogoStructure(taille: 40),
               ),
               const SizedBox(width: 10),
               const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -247,10 +246,10 @@ class _BarreLaterale extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 2),
                   child: Material(
                     color: d.id == courant ? const Color(0xFF1E4A40) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                     child: ListTile(
                       dense: true,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       leading: Icon(d.icone, color: d.id == courant ? Colors.white : const Color(0xFFD3E2DC), size: 20),
                       title: Text(d.libelle,
                           style: TextStyle(
@@ -265,7 +264,7 @@ class _BarreLaterale extends StatelessWidget {
           Container(
             margin: const EdgeInsets.all(12),
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: const Color(0xFF163A32), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(color: const Color(0xFF163A32), borderRadius: BorderRadius.circular(8)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Appareil ${etat.base!.appareil}${etat.estCentral ? ' · PC central' : ''}',
                   style: const TextStyle(color: Color(0xFFA9C2BA), fontSize: 12)),

@@ -25,6 +25,12 @@ Il tient en **une seule application** pour le PC (Windows) et le téléphone (An
 | Pharmacies, hospitalisation, facturation complète, achats | Phase 2 |
 | Paie, immobilisations, états SYCEBNL/SYSCOHADA, export Sage, prévisions | Phase 3 |
 
+## Présentation
+
+- Police **Arial** partout. Sur PC, c'est l'Arial de Windows. Sur téléphone, c'est son équivalent libre de mêmes dimensions, Liberation Sans, embarqué dans l'application.
+- Les documents PDF utilisent la même police.
+- Charte sobre ; logo de la structure dans l'entête et **en filigrane**. On peut aussi importer une entête toute faite (Paramétrage › Structure et documents).
+
 ## Deux comptabilités
 
 Le centre de santé et l'ONG sont deux entités distinctes :

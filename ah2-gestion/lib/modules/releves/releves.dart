@@ -37,7 +37,7 @@ class Releves {
         'n': lignes.length + 1,
         'heure': heureFr(DateTime.parse(a['horodatage'] as String)),
         'piece': a['piece'],
-        'dossier': a['numero_dossier'] ?? '—',
+        'dossier': a['numero_dossier'] ?? '',
         'acte': (a['quantite'] as int) > 1 ? '${a['libelle']} × ${a['quantite']}' : a['libelle'],
         'montant': montant,
         'mode': Modes.libelles[mode] ?? mode,
@@ -93,7 +93,7 @@ class Releves {
 
   /// Génère d'un coup les relevés de tous les services pour une date.
   static List<Operation> genererTous(Session s, String date) => [
-        for (final a in s.base.lignes('SELECT code FROM activites WHERE service=1 ORDER BY code'))
+        for (final a in s.base.lignes('SELECT code FROM activites WHERE service=1 AND actif=1 ORDER BY code'))
           if (s.base.valeur('SELECT 1 FROM releves WHERE activite=? AND date_actes=?', [a['code'], date]) == null)
             generer(s, activite: a['code'] as String, date: date),
       ];

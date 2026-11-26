@@ -59,11 +59,11 @@ class _EcranCaisseState extends State<EcranCaisse> {
             width: 250,
             child: Card(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(8),
                 side: BorderSide(color: t['id'] == _selection ? Couleurs.primaire : Colors.transparent, width: 2),
               ),
               child: InkWell(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(8),
                 onTap: () => setState(() => _selection = t['id'] as String),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -71,7 +71,7 @@ class _EcranCaisseState extends State<EcranCaisse> {
                     Text(t['libelle'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
                     Text('Compte ${t['compte']}', style: const TextStyle(fontSize: 12)),
                     const SizedBox(height: 8),
-                    Text(fcfa(Tresorerie.solde(b, t['id'] as String)), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    Text(fcfa(Tresorerie.solde(b, t['id'] as String)), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   ]),
                 ),
               ),
@@ -95,7 +95,7 @@ class _EcranCaisseState extends State<EcranCaisse> {
           child: Column(children: [
             for (final d in attente)
               ListTile(
-                title: Text('${d['motif']} – ${d['beneficiaire']}'),
+                title: Text('${d['motif']} : ${d['beneficiaire']}'),
                 subtitle: Text('${d['piece']} · ${dateFr(depuisIso(d['date'] as String))}'),
                 trailing: Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
                   Text(fcfa(d['montant'] as int), style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -135,7 +135,7 @@ class _EcranCaisseState extends State<EcranCaisse> {
               ),
             ListTile(
               title: const Text('Solde', style: TextStyle(fontWeight: FontWeight.w700)),
-              trailing: Text(fcfa(br['cloture'] as int), style: const TextStyle(fontWeight: FontWeight.w800)),
+              trailing: Text(fcfa(br['cloture'] as int), style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           ]),
         ),
@@ -246,7 +246,7 @@ class _EcranCaisseState extends State<EcranCaisse> {
                 ListTile(
                   dense: true,
                   title: Text(ecart < 0 ? 'Manquant' : (ecart > 0 ? 'Excédent' : 'Écart')),
-                  trailing: Text(fcfa(ecart), style: TextStyle(fontWeight: FontWeight.w800, color: ecart == 0 ? Couleurs.hausse : Couleurs.baisse)),
+                  trailing: Text(fcfa(ecart), style: TextStyle(fontWeight: FontWeight.bold, color: ecart == 0 ? Couleurs.hausse : Couleurs.baisse)),
                 ),
                 if (ecart != 0) TextField(controller: motif, decoration: const InputDecoration(labelText: "Motif de l'écart (obligatoire)")),
               ]),
@@ -290,7 +290,7 @@ void nouvelleDepense(BuildContext context, {String entite = 'CS'}) {
     context: context,
     builder: (c) => StatefulBuilder(builder: (c, maj) {
       final comptes = b.lignes("SELECT numero, libelle FROM comptes WHERE entite=? AND numero LIKE '6%' AND actif=1 ORDER BY numero", [ent]);
-      final activites = b.lignes('SELECT code, libelle FROM activites WHERE entite=? ORDER BY code', [ent]);
+      final activites = b.lignes('SELECT code, libelle FROM activites WHERE entite=? AND actif=1 ORDER BY code', [ent]);
       compte ??= comptes.isEmpty ? null : comptes.first['numero'] as String;
       activite ??= activites.last['code'] as String;
       return AlertDialog(

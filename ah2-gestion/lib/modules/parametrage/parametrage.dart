@@ -6,6 +6,7 @@ library;
 
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import '../../noyau/audit.dart';
 import '../../noyau/base.dart';
@@ -34,6 +35,7 @@ class Parametrage {
     String identifiantAdmin = 'admin',
     String nomAdmin = 'Administrateur',
     String nomAppareil = 'PC central',
+    Uint8List? logo,
   }) {
     if (base.entier('SELECT COUNT(*) FROM entites') > 0) {
       throw const RegleMetier('La base est déjà installée.');
@@ -62,7 +64,7 @@ class Parametrage {
             "INSERT INTO tresoreries(id, entite, type, libelle, compte, journal, appareil, centrale) VALUES (?,?,'caisse',?,?,?,?,1)",
             ['$ent-CAISSE', ent, 'Caisse centrale', '5711', 'CA1', base.appareil]);
         base.exec("INSERT INTO tresoreries(id, entite, type, libelle, compte, journal) VALUES (?,?,'banque',?,?,?)",
-            ['$ent-BQ', ent, 'Banque – compte courant', '5211', 'BQ1']);
+            ['$ent-BQ', ent, 'Banque, compte courant', '5211', 'BQ1']);
         base.exec(
             "INSERT INTO tresoreries(id, entite, type, libelle, compte, journal, operateur) VALUES (?,?,'momo',?,?,?,?)",
             ['$ent-MTN', ent, 'MTN Mobile Money', '5521', 'MTN', 'MTN']);
@@ -100,6 +102,10 @@ class Parametrage {
               base.exec('INSERT OR IGNORE INTO droits(role, module, action) VALUES (?,?,?)', [role, module, a]);
             }
           }));
+      if (logo != null) {
+        verifierImage(logo);
+        base.exec('UPDATE entites SET logo=?', [logo]);
+      }
       base.exec("INSERT INTO appareils(code, nom, type, central, cle_sync) VALUES (?,?,'pc',1,?)",
           [base.appareil, nomAppareil, _cleAleatoire()]);
       _insererUtilisateur(base, identifiantAdmin, nomAdmin, 'admin', motDePasseAdmin, null, null);
@@ -297,6 +303,257 @@ class Parametrage {
     });
   }
 
+
+  // ======================================================================
+  // Modifications du paramétrage par le comptable (ou l'administrateur).
+  // « Retirer » supprime ce qui n'a jamais servi ; ce qui a déjà servi est
+  // désactivé (l'historique et la comptabilité restent intacts).
+  // ======================================================================
+
+  static T _modifier<T>(Session s, String module, String objet, T Function() action, {Object? ancien, Object? nouveau}) {
+    final base = s.base;
+    return base.transaction(() {
+      _exigerCentral(base);
+      s.exiger(module, 'creer');
+      final r = action();
+      _versionSuivante(base);
+      Audit.tracer(base, utilisateur: s.utilisateur, action: 'modification', objet: objet, ancien: ancien, nouveau: nouveau);
+      return r;
+    });
+  }
+
+  static void _texte(String v, String quoi) {
+    if (v.trim().isEmpty) throw RegleMetier('$quoi est obligatoire.');
+  }
+
+  /// Contrôle qu'une image est bien un PNG ou un JPEG de taille raisonnable.
+  static void verifierImage(Uint8List o) {
+    final png = o.length > 8 && o[0] == 0x89 && o[1] == 0x50 && o[2] == 0x4E && o[3] == 0x47;
+    final jpg = o.length > 3 && o[0] == 0xFF && o[1] == 0xD8;
+    if (!png && !jpg) throw const RegleMetier('Image non reconnue : utilisez un fichier PNG ou JPEG.');
+    if (o.length > 2 * 1024 * 1024) throw const RegleMetier('Image trop lourde (2 Mo maximum).');
+  }
+
+  /// Logo de l'entité (null pour le retirer). Utilisé dans l'entête et en filigrane.
+  static void definirLogo(Session s, String entite, Uint8List? image) => _modifier(s, 'parametrage', 'logo:$entite', () {
+        if (image != null) verifierImage(image);
+        s.base.exec('UPDATE entites SET logo=? WHERE code=?', [image, entite]);
+      }, nouveau: image == null ? 'retiré' : '${image.length} octets');
+
+  /// Entête complète importée (image d'un papier à en-tête). Elle remplace
+  /// l'entête générée sur tous les documents A4. null pour la retirer.
+  static void definirEntete(Session s, String entite, Uint8List? image) => _modifier(s, 'parametrage', 'entete:$entite', () {
+        if (image != null) verifierImage(image);
+        s.base.exec('UPDATE entites SET entete=? WHERE code=?', [image, entite]);
+      }, nouveau: image == null ? 'retirée' : '${image.length} octets');
+
+  static void definirFiligrane(Session s, String entite, bool actif) => _modifier(s, 'parametrage', 'filigrane:$entite',
+      () => s.base.exec('UPDATE entites SET filigrane=? WHERE code=?', [actif ? 1 : 0, entite]), nouveau: actif);
+
+  // ------------------------------------------------------------ services
+  static void ajouterActivite(Session s,
+          {required String code, required String libelle, required String entite, bool service = true, String typeReleve = 'actes'}) =>
+      _modifier(s, 'parametrage', 'activite:$code', () {
+        final c = code.trim().toUpperCase();
+        if (!RegExp(r'^[A-Z][A-Z0-9_]{1,11}$').hasMatch(c)) throw const RegleMetier('Code de service invalide (ex. ECHO, DENT).');
+        _texte(libelle, 'Le libellé');
+        if (s.base.valeur('SELECT 1 FROM activites WHERE code=?', [c]) != null) throw RegleMetier('Le service $c existe déjà.');
+        s.base.exec('INSERT INTO activites(code, libelle, entite, service, type_releve) VALUES (?,?,?,?,?)',
+            [c, libelle.trim(), entite, service ? 1 : 0, typeReleve]);
+      }, nouveau: {'libelle': libelle, 'entite': entite});
+
+  static void modifierActivite(Session s, String code, {required String libelle}) => _modifier(s, 'parametrage', 'activite:$code', () {
+        _texte(libelle, 'Le libellé');
+        s.base.exec('UPDATE activites SET libelle=? WHERE code=?', [libelle.trim(), code]);
+      }, nouveau: libelle);
+
+  static String retirerActivite(Session s, String code) => _modifier(s, 'parametrage', 'activite:$code', () {
+        final b = s.base;
+        final utilise = b.valeur('SELECT 1 FROM actes WHERE activite=? LIMIT 1', [code]) != null ||
+            b.valeur('SELECT 1 FROM lignes_ecriture WHERE activite=? LIMIT 1', [code]) != null ||
+            b.valeur('SELECT 1 FROM actes_catalogue WHERE activite=? LIMIT 1', [code]) != null;
+        if (utilise) {
+          b.exec('UPDATE activites SET actif=0 WHERE code=?', [code]);
+          b.exec('UPDATE actes_catalogue SET actif=0 WHERE activite=?', [code]);
+          return 'désactivé';
+        }
+        b.exec('DELETE FROM activites WHERE code=?', [code]);
+        return 'supprimé';
+      }, nouveau: 'retiré');
+
+  static void reactiverActivite(Session s, String code) =>
+      _modifier(s, 'parametrage', 'activite:$code', () => s.base.exec('UPDATE activites SET actif=1 WHERE code=?', [code]), nouveau: 'réactivé');
+
+  // ------------------------------------------------------------ actes et prix
+  static void ajouterActe(Session s,
+          {required String code, required String libelle, required String activite, required String compteProduit, required int prix}) =>
+      _modifier(s, 'parametrage', 'acte:$code', () {
+        final b = s.base;
+        final c = code.trim().toUpperCase();
+        if (!RegExp(r'^[A-Z0-9][A-Z0-9_-]{1,19}$').hasMatch(c)) throw const RegleMetier("Code d'acte invalide (ex. LAB-HB).");
+        _texte(libelle, 'Le libellé');
+        if (prix < 0) throw const RegleMetier('Le prix ne peut pas être négatif.');
+        if (b.valeur('SELECT 1 FROM actes_catalogue WHERE code=?', [c]) != null) throw RegleMetier("L'acte $c existe déjà.");
+        final ent = b.valeur('SELECT entite FROM activites WHERE code=?', [activite]) ?? (throw const RegleMetier('Service inconnu.'));
+        if (b.valeur('SELECT 1 FROM comptes WHERE entite=? AND numero=? AND actif=1', [ent, compteProduit]) == null) {
+          throw RegleMetier("Le compte $compteProduit n'existe pas dans le plan comptable.");
+        }
+        b.exec('INSERT INTO actes_catalogue(code, libelle, activite, compte_produit) VALUES (?,?,?,?)', [c, libelle.trim(), activite, compteProduit]);
+        b.exec('INSERT INTO tarifs(code_acte, depuis, prix) VALUES (?,?,?)', [c, '2000-01-01', prix]);
+      }, nouveau: {'libelle': libelle, 'activite': activite, 'compte': compteProduit, 'prix': prix});
+
+  static void modifierActe(Session s, String code, {required String libelle, required String compteProduit}) =>
+      _modifier(s, 'parametrage', 'acte:$code', () {
+        _texte(libelle, 'Le libellé');
+        s.base.exec('UPDATE actes_catalogue SET libelle=?, compte_produit=? WHERE code=?', [libelle.trim(), compteProduit, code]);
+      }, nouveau: {'libelle': libelle, 'compte': compteProduit});
+
+  static String retirerActe(Session s, String code) => _modifier(s, 'parametrage', 'acte:$code', () {
+        final b = s.base;
+        if (b.valeur('SELECT 1 FROM actes WHERE code_acte=? LIMIT 1', [code]) != null) {
+          b.exec('UPDATE actes_catalogue SET actif=0 WHERE code=?', [code]);
+          return 'désactivé';
+        }
+        b.exec('DELETE FROM tarifs WHERE code_acte=?', [code]);
+        b.exec('DELETE FROM actes_catalogue WHERE code=?', [code]);
+        return 'supprimé';
+      }, nouveau: 'retiré');
+
+  static void reactiverActe(Session s, String code) =>
+      _modifier(s, 'parametrage', 'acte:$code', () => s.base.exec('UPDATE actes_catalogue SET actif=1 WHERE code=?', [code]), nouveau: 'réactivé');
+
+  // ------------------------------------------------------------ programmes de désintoxication
+  static void enregistrerProgramme(Session s,
+          {required String code,
+          required String libelle,
+          required String type,
+          required int duree,
+          required String modeCalcul,
+          required int montant,
+          String phases = ''}) =>
+      _modifier(s, 'parametrage', 'programme:$code', () {
+        final c = code.trim().toUpperCase();
+        if (!RegExp(r'^[A-Z0-9][A-Z0-9_-]{1,11}$').hasMatch(c)) throw const RegleMetier('Code de programme invalide (ex. RES-60).');
+        _texte(libelle, 'Le libellé');
+        if (!['ambulatoire', 'residentiel'].contains(type)) throw const RegleMetier('Type : ambulatoire ou residentiel.');
+        if (!['forfait', 'journalier'].contains(modeCalcul)) throw const RegleMetier('Calcul : forfait ou journalier.');
+        if (duree <= 0 || montant <= 0) throw const RegleMetier('Durée et montant doivent être positifs.');
+        s.base.exec(
+            'INSERT INTO programmes_desintox(code, libelle, type, duree_jours, phases, mode_calcul, montant) VALUES (?,?,?,?,?,?,?) '
+            'ON CONFLICT(code) DO UPDATE SET libelle=excluded.libelle, type=excluded.type, duree_jours=excluded.duree_jours, '
+            'phases=excluded.phases, mode_calcul=excluded.mode_calcul, montant=excluded.montant, actif=1',
+            [c, libelle.trim(), type, duree, phases, modeCalcul, montant]);
+      }, nouveau: {'libelle': libelle, 'type': type, 'duree': duree, 'calcul': modeCalcul, 'montant': montant});
+
+  static String retirerProgramme(Session s, String code) => _modifier(s, 'parametrage', 'programme:$code', () {
+        final b = s.base;
+        if (b.valeur('SELECT 1 FROM desintox_dossiers WHERE programme=? LIMIT 1', [code]) != null) {
+          b.exec('UPDATE programmes_desintox SET actif=0 WHERE code=?', [code]);
+          return 'désactivé';
+        }
+        b.exec('DELETE FROM programmes_desintox WHERE code=?', [code]);
+        return 'supprimé';
+      }, nouveau: 'retiré');
+
+  // ------------------------------------------------------------ plan comptable
+  static void ajouterCompte(Session s, {required String entite, required String numero, required String libelle}) =>
+      _modifier(s, 'comptabilite', 'compte:$entite:$numero', () {
+        final b = s.base;
+        if (!RegExp(r'^[1-9][0-9]{1,9}$').hasMatch(numero)) throw const RegleMetier('Numéro de compte invalide (chiffres uniquement).');
+        _texte(libelle, 'Le libellé');
+        if (b.valeur('SELECT 1 FROM comptes WHERE entite=? AND numero=?', [entite, numero]) != null) {
+          throw RegleMetier('Le compte $numero existe déjà.');
+        }
+        final ref = b.valeur('SELECT referentiel FROM entites WHERE code=?', [entite]);
+        b.exec('INSERT INTO comptes(entite, numero, libelle, origine, a_valider) VALUES (?,?,?,?,0)', [entite, numero, libelle.trim(), ref]);
+      }, nouveau: libelle);
+
+  static void modifierCompte(Session s, {required String entite, required String numero, required String libelle}) =>
+      _modifier(s, 'comptabilite', 'compte:$entite:$numero', () {
+        _texte(libelle, 'Le libellé');
+        s.base.exec('UPDATE comptes SET libelle=? WHERE entite=? AND numero=?', [libelle.trim(), entite, numero]);
+      }, nouveau: libelle);
+
+  static String retirerCompte(Session s, {required String entite, required String numero}) =>
+      _modifier(s, 'comptabilite', 'compte:$entite:$numero', () {
+        final b = s.base;
+        if (b.valeur("SELECT 1 FROM schemas_ecritures WHERE entite=? AND compte=?", [entite, numero]) != null ||
+            b.valeur('SELECT 1 FROM tresoreries WHERE entite=? AND compte=? AND actif=1', [entite, numero]) != null ||
+            b.valeur('SELECT 1 FROM actes_catalogue c JOIN activites a ON a.code=c.activite WHERE a.entite=? AND c.compte_produit=? AND c.actif=1',
+                    [entite, numero]) !=
+                null) {
+          throw RegleMetier('Le compte $numero est utilisé par le paramétrage (schéma, trésorerie ou acte) : modifiez d’abord ce paramétrage.');
+        }
+        final mouvemente = b.valeur(
+                'SELECT 1 FROM lignes_ecriture l JOIN ecritures e ON e.id=l.ecriture WHERE e.entite=? AND l.compte=? LIMIT 1', [entite, numero]) !=
+            null;
+        if (mouvemente) {
+          b.exec('UPDATE comptes SET actif=0 WHERE entite=? AND numero=?', [entite, numero]);
+          return 'désactivé';
+        }
+        b.exec('DELETE FROM comptes WHERE entite=? AND numero=?', [entite, numero]);
+        return 'supprimé';
+      }, nouveau: 'retiré');
+
+  static void reactiverCompte(Session s, {required String entite, required String numero}) => _modifier(
+      s, 'comptabilite', 'compte:$entite:$numero', () => s.base.exec('UPDATE comptes SET actif=1 WHERE entite=? AND numero=?', [entite, numero]),
+      nouveau: 'réactivé');
+
+  /// Change le compte (ou la variable) d'une ligne de schéma d'écriture.
+  static void modifierSchema(Session s, {required String entite, required String type, required int ordre, required String compte}) =>
+      _modifier(s, 'comptabilite', 'schema:$entite:$type:$ordre', () {
+        final b = s.base;
+        if (!compte.contains('{') && b.valeur('SELECT 1 FROM comptes WHERE entite=? AND numero=? AND actif=1', [entite, compte]) == null) {
+          throw RegleMetier("Le compte $compte n'existe pas dans le plan comptable.");
+        }
+        b.exec('UPDATE schemas_ecritures SET compte=? WHERE entite=? AND type_ecriture=? AND ordre=?', [compte, entite, type, ordre]);
+      }, nouveau: compte);
+
+  // ------------------------------------------------------------ comptes de trésorerie
+  static String ajouterTresorerie(Session s,
+          {required String entite, required String type, required String libelle, required String compte, String? operateur}) =>
+      _modifier(s, 'parametrage', 'tresorerie:$entite:$libelle', () {
+        final b = s.base;
+        if (!['caisse', 'banque', 'momo'].contains(type)) throw const RegleMetier('Type : caisse, banque ou momo.');
+        _texte(libelle, 'Le libellé');
+        if (b.valeur('SELECT 1 FROM comptes WHERE entite=? AND numero=?', [entite, compte]) == null) {
+          final ref = b.valeur('SELECT referentiel FROM entites WHERE code=?', [entite]);
+          b.exec('INSERT INTO comptes(entite, numero, libelle, origine, a_valider) VALUES (?,?,?,?,0)', [entite, compte, libelle.trim(), ref]);
+        }
+        final n = b.entier('SELECT COUNT(*) FROM tresoreries WHERE entite=?', [entite]) + 1;
+        final journal = '${type == 'banque' ? 'BQ' : type == 'momo' ? 'MM' : 'CA'}$n';
+        b.exec("INSERT OR IGNORE INTO journaux(entite, code, libelle, type) VALUES (?,?,?,?)", [entite, journal, libelle.trim(), type]);
+        final id = '$entite-${type.toUpperCase()}-$n';
+        b.exec('INSERT INTO tresoreries(id, entite, type, libelle, compte, journal, operateur) VALUES (?,?,?,?,?,?,?)',
+            [id, entite, type, libelle.trim(), compte, journal, operateur]);
+        return id;
+      }, nouveau: {'type': type, 'libelle': libelle, 'compte': compte});
+
+  static String retirerTresorerie(Session s, String id) => _modifier(s, 'parametrage', 'tresorerie:$id', () {
+        final b = s.base;
+        final solde = b.entier('SELECT COALESCE(SUM(montant),0) FROM mouvements_tresorerie WHERE tresorerie=?', [id]);
+        if (solde != 0) throw const RegleMetier('Le solde doit être nul : videz d’abord ce compte par un mouvement interne.');
+        if (b.valeur('SELECT 1 FROM mouvements_tresorerie WHERE tresorerie=? LIMIT 1', [id]) != null) {
+          b.exec('UPDATE tresoreries SET actif=0 WHERE id=?', [id]);
+          return 'désactivé';
+        }
+        b.exec('DELETE FROM tresoreries WHERE id=?', [id]);
+        return 'supprimé';
+      }, nouveau: 'retiré');
+
+  // ------------------------------------------------------------ utilisateurs
+  static void desactiverUtilisateur(Session s, String id, {bool actif = false}) {
+    final base = s.base;
+    base.transaction(() {
+      _exigerCentral(base);
+      s.exiger('utilisateurs', 'creer');
+      if (id == s.utilisateur) throw const RegleMetier('Vous ne pouvez pas désactiver votre propre compte.');
+      base.exec('UPDATE utilisateurs SET actif=? WHERE id=?', [actif ? 1 : 0, id]);
+      _versionSuivante(base);
+      Audit.tracer(base, utilisateur: s.utilisateur, action: 'modification', objet: 'utilisateur:$id', nouveau: actif ? 'réactivé' : 'désactivé');
+    });
+  }
+
   /// Instantané du paramétrage, diffusé à un appareil. Les clés de
   /// synchronisation des AUTRES appareils ne sont jamais transmises.
   static Map<String, Object?> exporter(Base base, {required String pourAppareil}) {
@@ -308,7 +565,9 @@ class Parametrage {
           for (final l in lignes) {...l, 'cle_sync': l['code'] == pourAppareil ? l['cle_sync'] : ''}
         ];
       }
-      tables[t] = lignes;
+      tables[t] = [
+        for (final l in lignes) {for (final e in l.entries) e.key: e.value is Uint8List ? {'\$b64': base64Encode(e.value as Uint8List)} : e.value}
+      ];
     }
     return {'version': base.paramInt('version_parametrage'), 'tables': tables};
   }
@@ -325,7 +584,7 @@ class Parametrage {
         for (final l in (tables[t] as List).cast<Map>()) {
           final cols = l.keys.cast<String>().toList();
           base.exec('INSERT INTO $t(${cols.join(',')}) VALUES (${List.filled(cols.length, '?').join(',')})',
-              [for (final c in cols) l[c]]);
+              [for (final c in cols) l[c] is Map ? base64Decode((l[c] as Map)['\$b64'] as String) : l[c]]);
         }
       }
     });

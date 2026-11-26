@@ -68,7 +68,7 @@ class _EcranDesintoxState extends State<EcranDesintox> {
     final patient = await choisirPatient(context);
     if (patient == null || !context.mounted) return;
     final b = Etat.lire(context).base!;
-    final programmes = b.lignes('SELECT * FROM programmes_desintox ORDER BY code');
+    final programmes = b.lignes('SELECT * FROM programmes_desintox WHERE actif=1 ORDER BY code');
     String programme = programmes.first['code'] as String;
     final responsables = <Responsable>[];
     final nom = TextEditingController(), lien = TextEditingController(), tel = TextEditingController();
@@ -247,7 +247,7 @@ class FicheDesintox extends StatelessWidget {
       body: PageContenu(largeurMax: 760, enfants: [
         Container(
           padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(color: Couleurs.barreLaterale, borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(color: Couleurs.barreLaterale, borderRadius: BorderRadius.circular(8)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(
@@ -286,7 +286,7 @@ class FicheDesintox extends StatelessWidget {
             margin: const EdgeInsets.only(top: 12),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-                color: Couleurs.alerteOrangeFond, border: Border.all(color: Couleurs.alerteOrangeBord), borderRadius: BorderRadius.circular(14)),
+                color: Couleurs.alerteOrangeFond, border: Border.all(color: Couleurs.alerteOrangeBord), borderRadius: BorderRadius.circular(8)),
             child: Text('Échéance non reçue : ${fcfa(e['manquant'] as int)} prévus le ${dateFr(depuisIso(e['date'] as String))}',
                 style: const TextStyle(fontWeight: FontWeight.w600, color: Couleurs.encre)),
           ),
