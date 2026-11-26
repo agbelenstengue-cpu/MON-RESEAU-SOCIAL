@@ -28,6 +28,7 @@ class Demo {
   static Map<String, String> installerCentral(Base b, {Uint8List? logo}) {
     initialiserModules();
     Parametrage.installerPcCentral(b, motDePasseAdmin: motDePasse, logo: logo);
+    b.transaction(() => b.definirParam('demonstration', '1'));
     final admin = Session.pour(b, 'admin');
     for (final u in [
       ['comptable', 'M. Ekotto', 'comptable', null],

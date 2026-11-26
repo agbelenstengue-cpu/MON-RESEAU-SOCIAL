@@ -192,7 +192,7 @@ class Parametrage {
     }
     base.exec(
         'INSERT INTO utilisateurs(id, identifiant, nom, role, activite, sel, empreinte, sel_code, empreinte_code) VALUES (?,?,?,?,?,?,?,?,?)',
-        [id, identifiant, nom, role, activite, sel, Securite.hacher(mdp, sel), selCode, empCode]);
+        [id, identifiant.trim().toLowerCase(), nom, role, activite, sel, Securite.hacher(mdp, sel), selCode, empCode]);
     return id;
   }
 
@@ -208,7 +208,7 @@ class Parametrage {
     return base.transaction(() {
       _exigerCentral(base);
       s.exiger('utilisateurs', 'creer');
-      if (base.valeur('SELECT 1 FROM utilisateurs WHERE identifiant=?', [identifiant]) != null) {
+      if (base.valeur('SELECT 1 FROM utilisateurs WHERE LOWER(identifiant)=LOWER(?)', [identifiant.trim()]) != null) {
         throw RegleMetier('L’identifiant « $identifiant » existe déjà.');
       }
       final id = _insererUtilisateur(base, identifiant, nom, role, motDePasse, activite, code);

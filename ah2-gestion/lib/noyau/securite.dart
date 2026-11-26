@@ -46,23 +46,24 @@ class Securite {
 
   /// Vérifie identifiant + mot de passe (ou code court sur téléphone).
   /// Verrouille le compte sur CET appareil après N échecs (paramètre).
-  static Map<String, Object?> connecter(Base base, String identifiant, String secret,
+  /// Le mot de passe ou le code court sont acceptés indifféremment ;
+  /// l'identifiant ne tient compte ni des majuscules ni des espaces.
+  static Map<String, Object?> connecter(Base base, String identifiantSaisi, String secret,
       {bool parCode = false}) {
+    final identifiant = identifiantSaisi.trim().toLowerCase();
+    secret = secret.trim();
     final cleEchecs = 'echecs:$identifiant';
     final cleVerrou = 'verrou:$identifiant';
     final verrou = base.valeur('SELECT valeur FROM etat_sync WHERE cle=?', [cleVerrou]) as String?;
     if (verrou != null && DateTime.parse(verrou).isAfter(base.maintenant)) {
       throw RegleMetier('Compte verrouillé après plusieurs échecs. Réessayez après ${heureFr(DateTime.parse(verrou))}.');
     }
-    final u = base.ligne('SELECT * FROM utilisateurs WHERE identifiant=? AND actif=1', [identifiant]);
+    final u = base.ligne('SELECT * FROM utilisateurs WHERE LOWER(TRIM(identifiant))=? AND actif=1', [identifiant]);
     bool ok = false;
-    if (u != null) {
-      if (parCode) {
-        if (u['empreinte_code'] != null) {
-          ok = _egal(hacher(secret, u['sel_code'] as String), u['empreinte_code'] as String);
-        }
-      } else {
-        ok = _egal(hacher(secret, u['sel'] as String), u['empreinte'] as String);
+    if (u != null && secret.isNotEmpty) {
+      ok = _egal(hacher(secret, u['sel'] as String), u['empreinte'] as String);
+      if (!ok && u['empreinte_code'] != null) {
+        ok = _egal(hacher(secret, u['sel_code'] as String), u['empreinte_code'] as String);
       }
     }
     if (!ok) {

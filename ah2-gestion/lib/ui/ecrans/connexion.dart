@@ -1,8 +1,6 @@
 /// Connexion : identifiant personnel + mot de passe, ou code court sur téléphone.
 library;
 
-import 'dart:io';
-
 import 'package:material_ui/material_ui.dart';
 
 import '../../noyau/outils.dart';
@@ -21,7 +19,7 @@ class EcranConnexion extends StatefulWidget {
 class _EcranConnexionState extends State<EcranConnexion> {
   final _id = TextEditingController();
   final _mdp = TextEditingController();
-  bool _parCode = Platform.isAndroid || Platform.isIOS;
+  bool _visible = false;
   String? _erreur;
   bool _enCours = false;
 
@@ -34,7 +32,7 @@ class _EcranConnexionState extends State<EcranConnexion> {
     // Le calcul de l'empreinte prend un court instant : on laisse l'écran se redessiner.
     await Future<void>.delayed(const Duration(milliseconds: 30));
     try {
-      final u = Securite.connecter(etat.base!, _id.text.trim(), _mdp.text, parCode: _parCode);
+      final u = Securite.connecter(etat.base!, _id.text, _mdp.text);
       etat.connecter(Session.depuisLigne(etat.base!, u));
     } on RegleMetier catch (e) {
       setState(() => _erreur = e.message);
@@ -66,25 +64,38 @@ class _EcranConnexionState extends State<EcranConnexion> {
               TextField(
                 controller: _id,
                 autofillHints: const [AutofillHints.username],
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.none,
+                keyboardType: TextInputType.visiblePassword,
                 decoration: const InputDecoration(labelText: 'Identifiant', prefixIcon: Icon(Icons.person_outline)),
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _mdp,
-                obscureText: true,
-                keyboardType: _parCode ? TextInputType.number : TextInputType.visiblePassword,
+                obscureText: !_visible,
+                autocorrect: false,
+                enableSuggestions: false,
+                keyboardType: TextInputType.visiblePassword,
                 decoration: InputDecoration(
-                    labelText: _parCode ? 'Code' : 'Mot de passe', prefixIcon: const Icon(Icons.lock_outline)),
+                  labelText: 'Mot de passe ou code court',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  suffixIcon: IconButton(
+                    tooltip: _visible ? 'Masquer' : 'Afficher',
+                    icon: Icon(_visible ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _visible = !_visible),
+                  ),
+                ),
                 onSubmitted: (_) => _connecter(),
               ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: () => setState(() => _parCode = !_parCode),
-                  child: Text(_parCode ? 'Utiliser le mot de passe' : 'Utiliser le code court'),
+              const SizedBox(height: 12),
+              if (b.param('demonstration', '0') == '1')
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: Text('Données de démonstration : identifiant « comptable » (ou caisse, direction, admin…), mot de passe « demo1234 ».',
+                      style: TextStyle(fontSize: 13)),
                 ),
-              ),
               if (_erreur != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
