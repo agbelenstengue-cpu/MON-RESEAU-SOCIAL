@@ -9,6 +9,8 @@ import 'desintox/desintox.dart';
 import 'dons/dons.dart';
 import 'facturation/facturation.dart';
 import 'hospitalisation/hospitalisation.dart';
+import 'immobilisations/immobilisations.dart';
+import 'paie/paie.dart';
 import 'patients/patients.dart';
 import 'releves/releves.dart';
 import 'stocks/stocks.dart';
@@ -32,4 +34,6 @@ void initialiserModules() {
   Stocks.declarer();
   Hospitalisation.declarer();
   Facturation.declarer();
+  Paie.declarer();
+  Immobilisations.declarer();
 }

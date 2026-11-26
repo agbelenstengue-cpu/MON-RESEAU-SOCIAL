@@ -36,6 +36,7 @@ class _EcranRapportsState extends State<EcranRapports> {
   String? _tresorerie;
   String? _stock;
   String? _patient;
+  String? _employe;
   final _racine = TextEditingController();
 
   Periode _periode(DateTime ref) {
@@ -69,6 +70,7 @@ class _EcranRapportsState extends State<EcranRapports> {
       date: dateIso(ref),
       racine: _racine.text.trim(),
       patient: _patient,
+      employe: _employe,
     );
     Rapport? produit;
     String? erreur;
@@ -126,7 +128,8 @@ class _EcranRapportsState extends State<EcranRapports> {
   }
 
   /// Les états comptables portent toujours sur une seule entité.
-  static bool _comptable(DefRapport d) => d.categorie == 'Comptabilité' || d.categorie == 'États financiers' || d.id == 'balance_agee';
+  static bool _comptable(DefRapport d) =>
+      d.categorie == 'Comptabilité' || d.categorie == 'États financiers' || d.categorie == 'Personnel et paie' || d.categorie == 'Immobilisations' || d.id == 'balance_agee';
 
   Widget _liste(BuildContext context) {
     final groupes = <String, List<DefRapport>>{};
@@ -243,6 +246,9 @@ class _EcranRapportsState extends State<EcranRapports> {
             if (id != null) setState(() => _patient = id);
           },
         ),
+      if (f.contains(Filtre.employe))
+        liste('Employé', _employe, [for (final e in b.lignes('SELECT id, nom FROM employes ORDER BY nom')) (e['id'] as String, e['nom'] as String)],
+            (v) => _employe = v),
       if (f.contains(Filtre.racine))
         SizedBox(
           width: 200,

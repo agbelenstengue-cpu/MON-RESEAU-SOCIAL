@@ -9,6 +9,8 @@ import '../modules/actes/actes.dart';
 import '../modules/desintox/desintox.dart';
 import '../modules/dons/dons.dart';
 import '../modules/hospitalisation/hospitalisation.dart';
+import '../modules/immobilisations/immobilisations.dart';
+import '../modules/paie/paie.dart';
 import '../modules/stocks/stocks.dart';
 import '../modules/modules.dart';
 import '../modules/parametrage/parametrage.dart';
@@ -98,6 +100,22 @@ class Demo {
       Stocks.entrer(comptable, stock: 'LAB', origine: 'achat', fournisseur: fournisseur, lignes: const [
         LigneStock('BANDE', 8, lot: 'BG-7', coutUnitaire: 6000),
       ]);
+      // Personnel et immobilisations de démonstration.
+      for (final e in [
+        ['ABENA Paul', 'Médecin', 'CONS', 450000, 50000],
+        ['NGO BASSA Marie', 'Caissière', 'ADM_CS', 120000, 15000],
+        ['FOUDA Éric', 'Technicien de laboratoire', 'LAB', 150000, 20000],
+      ]) {
+        Paie.enregistrerEmploye(comptable,
+            nom: e[0] as String, entite: 'CS', poste: e[1] as String, activite: e[2] as String, salaireBase: e[3] as int, primes: e[4] as int,
+            embauche: '2024-01-02', contrat: 'CDI');
+      }
+      Paie.enregistrerEmploye(comptable, nom: 'TCHOUPO Alain', entite: 'ONG', poste: 'Animateur social', statut: 'benevole', salaireBase: 40000);
+      Paie.calculer(comptable, entite: 'CS', periode: _iso(b.maintenant).substring(0, 7));
+      Immobilisations.acquerir(comptable, entite: 'CS', designation: 'Microscope binoculaire', categorie: 'MED', valeur: 1200000, origine: 'achat',
+          localisation: 'Laboratoire', activite: 'LAB', dateAcquisition: '2025-06-15');
+      Immobilisations.acquerir(comptable, entite: 'CS', designation: 'Ordinateur de la caisse', categorie: 'INFO', valeur: 450000, origine: 'achat',
+          localisation: 'Accueil', activite: 'ADM_CS', dateAcquisition: '2026-02-01');
       final donateur = Dons.creerDonateur(comptable, nom: 'Fondation Espoir Solidaire', type: 'fondation', pays: 'France').d<String>('id');
       final membre = Dons.creerDonateur(comptable, nom: 'M. Tchoupo (membre)', type: 'membre').d<String>('id');
       // Dossier de désintoxication de la maquette : 450 000 FCFA, 225 000 versés.

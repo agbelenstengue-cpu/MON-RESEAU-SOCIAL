@@ -81,6 +81,17 @@ La liste de travail a trois onglets : *En cours*, *Sortis avec solde dû* et *Ar
 - **Programmes de désintoxication**, **comptes de trésorerie** (banques, mobile money, caisses), **plan comptable**, **schémas d'écritures**, **seuils et délais**, **utilisateurs**.
 - Retirer un élément qui n'a jamais servi le supprime. Retirer un élément qui a déjà servi le **désactive** : il disparaît des listes de saisie, mais l'historique et la comptabilité restent intacts. On peut le réactiver.
 
+**Rapports et états (écran Rapports) :** choisissez l'état, la période (jour, semaine, mois, trimestre, année ou dates libres) et les filtres (entité, service, utilisateur, appareil, subvention), puis exportez en PDF ou Excel. Pour contrôler un service sur place, utilisez la « Liste des actes à contrôler sur place » : chaque acte a une case « Constaté ».
+
+**Comptabilité :** saisie d'écritures et soldes d'ouverture (journal AN), rapprochement bancaire, lettrage, clôture d'exercice, export Sage. Le bilan, le compte de résultat, les notes annexes et les prévisions se trouvent dans Rapports, catégorie « États financiers ».
+
+## Pharmacien
+
+- **Vente** : Pharmacies et stocks, puis *Vente*. Les lots sont pris du premier périmé au dernier (FEFO).
+- **Délivrances** : pendant une hospitalisation (depuis la fiche du séjour) ou en désintoxication (depuis la fiche du patient). Choisissez *compris dans le forfait* ou *facturé au patient*.
+- **Entrées** : achat avec n° de lot et péremption, ou don en nature (reçu par l'ONG et transféré au centre).
+- **Inventaire** : imprimez la fiche de comptage, saisissez les quantités comptées et validez. Les écarts sont comptabilisés.
+
 ## Direction, présidence, trésorerie
 
 - **Tableau de bord** : recettes, charges, soldes de chaque caisse, banque et mobile money, santé de chaque activité (en hausse, stable ou en baisse), alertes.

@@ -16,6 +16,7 @@ import 'desintox.dart';
 import 'dons.dart';
 import 'encaissement.dart';
 import 'hospitalisation_ecran.dart';
+import 'paie_immo_ecran.dart';
 import 'parametrage_ecran.dart';
 import 'patients.dart';
 import 'rapports_ecran.dart';
@@ -57,6 +58,8 @@ final destinations = <Destination>[
   Destination('hospitalisation', 'Hospitalisation', Icons.bed_outlined, (e) => _peut(e, 'hospitalisation'), () => const EcranHospitalisation()),
   Destination('caisse', 'Caisse et trésorerie', Icons.account_balance_wallet_outlined,
       (e) => _peut(e, 'caisse') || _peut(e, 'tresorerie'), () => const EcranCaisse()),
+  Destination('paie', 'Personnel et paie', Icons.badge_outlined, (e) => _peut(e, 'paie'), () => const EcranPaie()),
+  Destination('immobilisations', 'Immobilisations', Icons.domain_outlined, (e) => _peut(e, 'immobilisations'), () => const EcranImmobilisations()),
   Destination('releves', 'Relevés journaliers', Icons.fact_check_outlined, (e) => _peut(e, 'releves'), () => const EcranReleves()),
   Destination('dons', 'Dons et subventions', Icons.volunteer_activism_outlined, (e) => _peut(e, 'dons'), () => const EcranDons()),
   Destination('rapports', 'Rapports', Icons.insert_chart_outlined, (e) => _peut(e, 'rapports'), () => const EcranRapports()),

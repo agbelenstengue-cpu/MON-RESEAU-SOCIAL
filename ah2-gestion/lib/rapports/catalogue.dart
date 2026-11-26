@@ -6,17 +6,19 @@ import '../noyau/base.dart';
 import '../noyau/outils.dart';
 import 'etats_comptables.dart';
 import 'etats_gestion.dart';
+import 'etats_phase3.dart';
 import 'etats_stocks_hospitalisation.dart';
 import 'modele.dart';
 
-enum Filtre { periode, date, entite, activite, utilisateur, appareil, subvention, tresorerie, racine, stock, patient }
+enum Filtre { periode, date, entite, activite, utilisateur, appareil, subvention, tresorerie, racine, stock, patient, employe }
 
 class Parametres {
   final Filtres filtres;
   final String date;
   final String racine;
   final String? patient;
-  const Parametres(this.filtres, {required this.date, this.racine = '', this.patient});
+  final String? employe;
+  const Parametres(this.filtres, {required this.date, this.racine = '', this.patient, this.employe});
   Periode get periode => filtres.periode;
   String get entite => filtres.entite ?? 'CS';
 }
@@ -95,6 +97,23 @@ class Catalogue {
         (b, p) => EtatsTiers.releveCompte(b, p.patient ?? '', p.periode)),
     DefRapport('relances', 'Gestion', 'Créances à relancer', 'Patients et organismes qui doivent depuis plus de 30 jours.', {Filtre.date},
         (b, p) => EtatsTiers.relances(b, p.date)),
+    DefRapport('notes_annexes', 'États financiers', 'Notes annexes', 'Règles comptables, immobilisations, stocks, créances et dettes.',
+        {Filtre.date, Filtre.entite}, (b, p) => EtatsFinanciersAnnexes.notes(b, p.entite, int.parse(p.date.substring(0, 4)))),
+    DefRapport('previsions', 'États financiers', 'Prévisions de trésorerie et de résultat', 'À 30 et 90 jours ; résultat projeté de fin d’exercice.',
+        {Filtre.entite}, (b, p) => Previsions.rapport(b, p.entite)),
+    DefRapport('bulletin', 'Personnel et paie', 'Bulletin de paie', '', {Filtre.date, Filtre.employe},
+        (b, p) => EtatsPaie.bulletin(b, p.employe ?? '', p.date.substring(0, 7))),
+    DefRapport('livre_paie', 'Personnel et paie', 'Livre de paie', '', {Filtre.periode, Filtre.entite}, (b, p) => EtatsPaie.livre(b, p.entite, p.periode)),
+    DefRapport('declaration_cnps', 'Personnel et paie', 'Déclaration CNPS du mois', '', {Filtre.date, Filtre.entite},
+        (b, p) => EtatsPaie.declaration(b, p.entite, p.date.substring(0, 7), organisme: 'CNPS')),
+    DefRapport('declaration_fiscale', 'Personnel et paie', 'État des retenues fiscales du mois', '', {Filtre.date, Filtre.entite},
+        (b, p) => EtatsPaie.declaration(b, p.entite, p.date.substring(0, 7), organisme: 'ETAT')),
+    DefRapport('registre_immo', 'Immobilisations', 'Registre des immobilisations', '', {Filtre.date, Filtre.entite},
+        (b, p) => EtatsImmobilisations.registre(b, p.entite, p.date)),
+    DefRapport('amortissements', 'Immobilisations', 'Tableau des amortissements', '', {Filtre.date, Filtre.entite},
+        (b, p) => EtatsImmobilisations.tableauAmortissements(b, p.entite, int.parse(p.date.substring(0, 4)))),
+    DefRapport('inventaire_immo', 'Immobilisations', "Fiche d'inventaire physique des biens", '', {Filtre.entite},
+        (b, p) => EtatsImmobilisations.ficheInventaire(b, p.entite)),
     DefRapport('releves_suivi', 'Contrôle', 'Suivi des relevés et des écarts', '', {Filtre.periode}, (b, p) => EtatsGestion.suiviReleves(b, p.periode)),
     DefRapport('anomalies', 'Contrôle', 'Anomalies de synchronisation', '', {Filtre.periode}, (b, p) => EtatsGestion.anomalies(b, p.periode)),
   ];

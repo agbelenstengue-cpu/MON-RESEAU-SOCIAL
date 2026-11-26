@@ -8,6 +8,7 @@ import '../../noyau/outils.dart';
 import '../etat_app.dart';
 import '../theme.dart';
 import '../widgets/commun.dart';
+import '../../rapports/etats_phase3.dart';
 
 class EcranTableauBord extends StatelessWidget {
   const EcranTableauBord({super.key});
@@ -112,6 +113,41 @@ class EcranTableauBord extends StatelessWidget {
         ),
       ]),
       const SizedBox(height: 16),
+      Wrap(spacing: 16, runSpacing: 16, children: [
+        SizedBox(
+          width: larg >= 1100 ? 640 : double.infinity,
+          child: Carte(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const TitreSection('Tendance sur 12 mois', sousTitre: 'recettes (vert) et charges (gris)'),
+              const SizedBox(height: 12),
+              Courbes12Mois(donnees: Previsions.douzeMois(b)),
+            ]),
+          ),
+        ),
+        SizedBox(
+          width: larg >= 1100 ? 440 : double.infinity,
+          child: Carte(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const TitreSection('Perspectives'),
+              const SizedBox(height: 8),
+              for (final ent in ['CS', 'ONG'])
+                () {
+                  final p30 = Previsions.tresorerie(b, ent, 30), p90 = Previsions.tresorerie(b, ent, 90);
+                  final r = Previsions.resultatProjete(b, ent);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(ent == 'CS' ? 'Centre de santé' : 'ONG', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text('Trésorerie prévue : ${fcfa(p30['solde_previsionnel'] as int)} à 30 jours, ${fcfa(p90['solde_previsionnel'] as int)} à 90 jours'),
+                      Text('Résultat projeté fin d’exercice : ${fcfa(r['projete']!)}'),
+                    ]),
+                  );
+                }(),
+            ]),
+          ),
+        ),
+      ]),
+      const SizedBox(height: 16),
       Carte(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           TitreSection('Alertes à traiter', sousTitre: alertes.isEmpty ? 'aucune' : '${alertes.length}'),
@@ -137,5 +173,40 @@ class EcranTableauBord extends StatelessWidget {
         ]),
       ),
     ]);
+  }
+}
+
+
+/// Histogramme sobre recettes / charges sur 12 mois.
+class Courbes12Mois extends StatelessWidget {
+  final List<Map<String, Object>> donnees;
+  const Courbes12Mois({super.key, required this.donnees});
+
+  static const _mois = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+  @override
+  Widget build(BuildContext context) {
+    final max = donnees.fold<int>(1, (m, d) => [m, d['recettes'] as int, d['charges'] as int].reduce((a, b) => a > b ? a : b));
+    final primaire = Theme.of(context).colorScheme.primary;
+    return SizedBox(
+      height: 180,
+      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        for (final d in donnees)
+          Expanded(
+            child: Tooltip(
+              message: '${d['mois']} : recettes ${fcfa(d['recettes'] as int)}, charges ${fcfa(d['charges'] as int)}',
+              child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.end, mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Container(width: 8, height: 140 * ((d['recettes'] as int).clamp(0, max)) / max, color: primaire),
+                  const SizedBox(width: 2),
+                  Container(width: 8, height: 140 * ((d['charges'] as int).clamp(0, max)) / max, color: const Color(0xFFB0B0B0)),
+                ]),
+                const SizedBox(height: 4),
+                Text(_mois[int.parse((d['mois'] as String).substring(5)) - 1], style: const TextStyle(fontSize: 10)),
+              ]),
+            ),
+          ),
+      ]),
+    );
   }
 }

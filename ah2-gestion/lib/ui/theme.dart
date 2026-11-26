@@ -71,11 +71,13 @@ ThemeData themeAh2(Brightness luminosite) {
       style: FilledButton.styleFrom(
         minimumSize: const Size(64, 52),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+        textStyle: const TextStyle(fontFamily: 'Arial', fontSize: 15, fontWeight: FontWeight.bold),
       ),
     ),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(textStyle: const TextStyle(fontFamily: 'Arial', fontWeight: FontWeight.bold))),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
+        textStyle: const TextStyle(fontFamily: 'Arial', fontWeight: FontWeight.bold),
         minimumSize: const Size(64, 48),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
       ),

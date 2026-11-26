@@ -12,6 +12,9 @@ import '../../noyau/outils.dart';
 import '../etat_app.dart';
 import '../theme.dart';
 import '../widgets/commun.dart';
+import '../widgets/enregistrer_fichier.dart';
+import '../../rapports/etats_phase3.dart';
+import '../../rapports/modele.dart';
 import 'compta_outils.dart';
 
 class EcranComptabilite extends StatefulWidget {
@@ -61,6 +64,25 @@ class _EcranComptabiliteState extends State<EcranComptabilite> {
     final ecr = b.lignes('SELECT * FROM ecritures WHERE entite=? ORDER BY id DESC LIMIT 200', [_entite]);
     final deseq = Moteur.ecrituresDesequilibrees(b);
     return ListView(padding: const EdgeInsets.all(16), children: [
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        OutlinedButton.icon(
+          icon: const Icon(Icons.upload_file_outlined),
+          label: const Text('Export Sage du mois'),
+          onPressed: () {
+            final p = Periode.mois(dateIso(b.maintenant));
+            enregistrerFichier(context, ExportSage.generer(b, _entite, p), 'ecritures_${_entite}_${p.du.substring(0, 7)}.csv');
+          },
+        ),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.upload_file_outlined),
+          label: const Text("Export Sage de l'année"),
+          onPressed: () {
+            final p = Periode.annee(dateIso(b.maintenant));
+            enregistrerFichier(context, ExportSage.generer(b, _entite, p), 'ecritures_${_entite}_${p.du.substring(0, 4)}.csv');
+          },
+        ),
+      ]),
+      const SizedBox(height: 8),
       Pastille(deseq.isEmpty ? 'Toutes les écritures sont équilibrées' : '${deseq.length} écriture(s) déséquilibrée(s)',
           couleur: deseq.isEmpty ? Couleurs.hausse : Couleurs.baisse),
       const SizedBox(height: 8),

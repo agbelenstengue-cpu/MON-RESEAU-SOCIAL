@@ -6,24 +6,23 @@ Il tient en **une seule application** pour le PC (Windows) et le téléphone (An
 
 ![Accueil sur PC](docs/captures/pc_accueil.png)
 
-## État : phase 1 (§12 du cahier des charges)
+## État : les trois phases du cahier des charges (§12)
 
-| Domaine | État |
+| Domaine | Contenu |
 |---|---|
-| Architecture hors ligne, base locale par appareil (chiffrée), synchronisation Wi-Fi chiffrée | ✅ |
-| Interface moderne : barre latérale sur PC, barre en bas sur téléphone, bouton (+), recherche, modes clair et sombre, taille du texte réglable | ✅ |
-| Paramétrage : 2 entités, plans comptables, journaux, activités, tarifs historisés, seuils, rôles et droits, appareils | ✅ |
-| Patients (historique des versions, conflits signalés) | ✅ |
-| Caisse et trésorerie : caisses centrale et mobiles, banque, mobile money, dépenses avec validation, mouvements internes, arrêté avec billetage | ✅ |
-| Consultations, laboratoire, massages (actes, gratuités, remises, crédit, prise en charge) | ✅ |
-| Désintoxication (§6.6 complet, dont l'archivage automatique et la réadmission) | ✅ |
-| Relevés journaliers (§7) et fiches d'écart | ✅ |
-| Dons et subventions (ONG) | ✅ |
-| Moteur d'écritures, clôtures journalières, verrouillage des périodes | ✅ |
-| Rapports journaliers, tableau de bord, alertes | ✅ |
-| Sauvegardes chiffrées et restauration | ✅ |
-| Pharmacies, hospitalisation, facturation complète, achats | Phase 2 |
-| Paie, immobilisations, états SYCEBNL/SYSCOHADA, export Sage, prévisions | Phase 3 |
+| Socle | Hors ligne, base locale chiffrée par appareil, synchronisation Wi-Fi chiffrée, mises à jour sans perte de données |
+| Paramétrage | Tout est modifiable par le comptable : services, actes et prix, programmes, comptes, schémas d'écritures, trésorerie, lits, produits, taux de paie, catégories d'immobilisations, seuils |
+| Patients, caisse, actes | Encaissement, gratuités, remises, crédit, prise en charge, caisses mobiles, arrêté avec billetage, carnets de séances, avoirs |
+| Désintoxication | Inscription, versements, échéancier, sortie, archivage, réadmission, médicaments compris ou facturés |
+| Pharmacies et stocks | Lots, FEFO, CUMP, inventaire, alertes, conflits hors ligne, fournisseurs, commandes, réceptions, règlements |
+| Hospitalisation | Lits, admission avec caution, journées, actes et produits du séjour, facture, sortie |
+| Dons et subventions | ONG (SYCEBNL), dons en nature transférés au centre, suivi budgétaire des subventions |
+| Personnel et paie | Salariés et bénévoles, rubriques datées, avances, bulletins, livre de paie, déclarations, paiement, congés |
+| Immobilisations | Registre, amortissements mensuels, cessions, inventaire |
+| Comptabilité | Journaux, grand livre, balances, balance âgée, lettrage, rapprochement, saisie, soldes d'ouverture, clôture d'exercice, analytique |
+| États financiers | Bilan, compte de résultat (SYSCOHADA et SYCEBNL), notes annexes, prévisions de trésorerie et de résultat |
+| Rapports | Plus de 35 états, par période (jour, semaine, mois, trimestre, année, dates libres) et par filtres, en PDF et Excel ; export Sage |
+| Tableau de bord | Indicateurs, tendances sur 12 mois, perspectives, alertes (dont déficit) |
 
 ## Présentation
 

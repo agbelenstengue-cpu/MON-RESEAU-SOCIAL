@@ -607,5 +607,5 @@ void main() {
     });
   });
 
-  test('§13.9 Stocks et CUMP : prévus en phase 2 (pharmacies)', () {}, skip: 'Phase 2 : pharmacies moderne et traditionnelle');
+  // §13.9 (stock calculé, CUMP) : voir test/lot_b_test.dart.
 }

@@ -94,7 +94,7 @@ class Moteur {
     final id = base.db.lastInsertRowId;
     for (final l in produites) {
       final compte = l['compte'] as String;
-      final estTiers = compte.startsWith('40') || compte.startsWith('41') || compte.startsWith('46');
+      final estTiers = compte.startsWith('40') || compte.startsWith('41') || compte.startsWith('42') || compte.startsWith('46');
       base.exec(
           'INSERT INTO lignes_ecriture(ecriture, compte, debit, credit, activite, subvention, tiers) VALUES (?,?,?,?,?,?,?)',
           [id, compte, l['debit'], l['credit'], l['activite'], l['subvention'], estTiers ? tiers : null]);
