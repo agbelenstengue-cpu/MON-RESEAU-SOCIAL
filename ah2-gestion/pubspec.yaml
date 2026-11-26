@@ -7,8 +7,10 @@ environment:
   sdk: ^3.14.0
 
 dependencies:
+  archive: ^4.7.1
   crypto: ^3.0.8
   cupertino_ui: ^1.1.7
+  file_selector: ^1.1.0
   flutter:
     sdk: flutter
   flutter_localizations:
@@ -21,6 +23,7 @@ dependencies:
   pdf: ^3.13.1
   pointycastle: ^4.0.0
   printing: ^5.15.1
+  share_plus: ^13.3.1
   sqlite3: ^3.9.2
   uuid: ^4.6.0
 

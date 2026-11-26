@@ -1,8 +1,8 @@
 /// Données de paramétrage livrées par défaut, À VALIDER PAR LE COMPTABLE.
 ///
 /// Deux comptabilités distinctes :
-///  * CS , Centre de santé : plan SYSCOHADA révisé ;
-///  * ONG, A Hand to Humanity : plan SYCEBNL (dons, subventions, programmes).
+///  * CS : Centre de santé : plan SYSCOHADA révisé ;
+///  * ONG : A Hand to Humanity : plan SYCEBNL (dons, subventions, programmes).
 /// Les numéros sont indicatifs (§6.15, §15) : tout est modifiable dans le
 /// paramétrage, rien n'est codé en dur dans les modules.
 library;
@@ -20,6 +20,24 @@ const entitesDefaut = [
 
 /// Comptes communs aux deux entités (numérotation OHADA).
 const _communs = [
+  CompteDefaut('1011', 'Capital ou fonds associatifs'),
+  CompteDefaut('1211', 'Report à nouveau créditeur'),
+  CompteDefaut('1291', 'Report à nouveau débiteur'),
+  CompteDefaut('1311', "Résultat net de l'exercice : bénéfice ou excédent"),
+  CompteDefaut('1391', "Résultat net de l'exercice : perte ou déficit"),
+  CompteDefaut('2311', 'Bâtiments'),
+  CompteDefaut('2411', 'Matériel médical et technique'),
+  CompteDefaut('2442', 'Matériel informatique'),
+  CompteDefaut('2444', 'Mobilier de bureau'),
+  CompteDefaut('2451', 'Matériel de transport'),
+  CompteDefaut('2831', 'Amortissements des bâtiments'),
+  CompteDefaut('2841', 'Amortissements du matériel médical et technique'),
+  CompteDefaut('2844', 'Amortissements du matériel et mobilier de bureau'),
+  CompteDefaut('2845', 'Amortissements du matériel de transport'),
+  CompteDefaut('4211', 'Personnel, avances et acomptes'),
+  CompteDefaut('6813', 'Dotations aux amortissements des immobilisations corporelles'),
+  CompteDefaut('8121', 'Valeur comptable des cessions d’immobilisations'),
+  CompteDefaut('8221', 'Produits des cessions d’immobilisations'),
   CompteDefaut('4011', 'Fournisseurs'),
   CompteDefaut('4221', 'Personnel, rémunérations dues'),
   CompteDefaut('4311', 'Sécurité sociale (CNPS)'),
@@ -56,6 +74,11 @@ const comptesCS = [
   CompteDefaut('6011', 'Achats de médicaments'),
   CompteDefaut('6031', 'Variation des stocks de marchandises'),
   CompteDefaut('6041', 'Achats de réactifs et consommables de laboratoire'),
+  CompteDefaut('6012', 'Achats de produits de la pharmacie traditionnelle'),
+  CompteDefaut('6033', 'Variation des stocks de réactifs et consommables'),
+  CompteDefaut('3111', 'Stock de médicaments (pharmacie moderne)'),
+  CompteDefaut('3112', 'Stock de produits de la pharmacie traditionnelle'),
+  CompteDefaut('3311', 'Stock de réactifs et consommables de laboratoire'),
   CompteDefaut('7011', 'Ventes de la pharmacie moderne'),
   CompteDefaut('7012', 'Ventes de la pharmacie traditionnelle'),
   CompteDefaut('7061', 'Prestations de consultations'),
@@ -70,6 +93,7 @@ const comptesCS = [
 const comptesONG = [
   ..._communs,
   CompteDefaut('3111', 'Stocks reçus en don (médicaments, fournitures)'),
+  CompteDefaut('1411', "Dons et subventions d'investissement reçus"),
   CompteDefaut('4671', 'Compte de liaison Centre de santé'),
   CompteDefaut('6581', 'Aides et secours accordés (programmes sociaux)'),
   CompteDefaut('7181', "Subventions d'exploitation des bailleurs"),
@@ -87,6 +111,7 @@ const journauxDefaut = [
   ['PA', 'Paie', 'paie'],
   ['OD', 'Opérations diverses', 'od'],
   ['AN', 'À-nouveaux', 'an'],
+  ['CL', "Clôture de l'exercice", 'od'],
 ];
 
 /// [code, libellé, entité, service (relevé), type de relevé]
@@ -139,7 +164,56 @@ const _schemasCommuns = [
   ['ecart_caisse_excedent', 2, 'C', '7588', 'total', 'unique', '{journal_tresorerie}', 'Excédent de caisse'],
 ];
 
+/// Schémas des phases 2 et 3 (communs aux deux entités).
+const _schemasGestion = [
+  ['achat_fournisseur', 1, 'D', '{compte_achat}', 'total', 'unique', 'AC', 'Achat fournisseur'],
+  ['achat_fournisseur', 2, 'C', '4011', 'total', 'unique', 'AC', 'Achat fournisseur'],
+  ['entree_stock', 1, 'D', '{compte_stock}', 'total', 'unique', 'OD', 'Entrée en stock'],
+  ['entree_stock', 2, 'C', '{compte_variation}', 'total', 'unique', 'OD', 'Entrée en stock'],
+  ['sortie_stock', 1, 'D', '{compte_variation}', 'total', 'unique', 'OD', 'Sortie de stock'],
+  ['sortie_stock', 2, 'C', '{compte_stock}', 'total', 'unique', 'OD', 'Sortie de stock'],
+  ['entree_stock_liaison', 1, 'D', '{compte_stock}', 'total', 'unique', 'OD', 'Don en nature reçu par l’ONG'],
+  ['entree_stock_liaison', 2, 'C', '4671', 'total', 'unique', 'OD', 'Don en nature reçu par l’ONG'],
+  ['reglement_fournisseur', 1, 'D', '4011', 'total', 'unique', '{journal_tresorerie}', 'Règlement fournisseur'],
+  ['reglement_fournisseur', 2, 'C', '{tresorerie}', 'total', 'unique', '{journal_tresorerie}', 'Règlement fournisseur'],
+  ['avance_salaire', 1, 'D', '4211', 'total', 'unique', '{journal_tresorerie}', 'Avance sur salaire'],
+  ['avance_salaire', 2, 'C', '{tresorerie}', 'total', 'unique', '{journal_tresorerie}', 'Avance sur salaire'],
+  ['paie_brut', 1, 'D', '6611', 'total', 'unique', 'PA', 'Salaires bruts'],
+  ['paie_brut', 2, 'C', '4221', 'total', 'unique', 'PA', 'Salaires bruts'],
+  ['paie_retenues_cnps', 1, 'D', '4221', 'total', 'unique', 'PA', 'Cotisations sociales salariales'],
+  ['paie_retenues_cnps', 2, 'C', '4311', 'total', 'unique', 'PA', 'Cotisations sociales salariales'],
+  ['paie_retenues_etat', 1, 'D', '4221', 'total', 'unique', 'PA', 'Retenues fiscales'],
+  ['paie_retenues_etat', 2, 'C', '4471', 'total', 'unique', 'PA', 'Retenues fiscales'],
+  ['paie_patronales_cnps', 1, 'D', '6641', 'total', 'unique', 'PA', 'Charges patronales CNPS'],
+  ['paie_patronales_cnps', 2, 'C', '4311', 'total', 'unique', 'PA', 'Charges patronales CNPS'],
+  ['paie_patronales_etat', 1, 'D', '6641', 'total', 'unique', 'PA', 'Charges patronales fiscales'],
+  ['paie_patronales_etat', 2, 'C', '4471', 'total', 'unique', 'PA', 'Charges patronales fiscales'],
+  ['paie_avances', 1, 'D', '4221', 'total', 'unique', 'PA', 'Avances déduites'],
+  ['paie_avances', 2, 'C', '4211', 'total', 'unique', 'PA', 'Avances déduites'],
+  ['paiement_salaire', 1, 'D', '4221', 'total', 'unique', '{journal_tresorerie}', 'Paiement des salaires'],
+  ['paiement_salaire', 2, 'C', '{tresorerie}', 'total', 'unique', '{journal_tresorerie}', 'Paiement des salaires'],
+  ['immo_acquisition', 1, 'D', '{compte_immobilisation}', 'total', 'unique', 'OD', 'Acquisition d’immobilisation'],
+  ['immo_acquisition', 2, 'C', '{contrepartie}', 'total', 'unique', 'OD', 'Acquisition d’immobilisation'],
+  ['dotation_amortissement', 1, 'D', '6813', 'total', 'unique', 'OD', 'Dotation aux amortissements'],
+  ['dotation_amortissement', 2, 'C', '{compte_amortissement}', 'total', 'unique', 'OD', 'Dotation aux amortissements'],
+  ['sortie_immo_amortissement', 1, 'D', '{compte_amortissement}', 'total', 'unique', 'OD', 'Sortie d’immobilisation'],
+  ['sortie_immo_amortissement', 2, 'C', '{compte_immobilisation}', 'total', 'unique', 'OD', 'Sortie d’immobilisation'],
+  ['sortie_immo_vnc', 1, 'D', '8121', 'total', 'unique', 'OD', 'Valeur comptable de la sortie'],
+  ['sortie_immo_vnc', 2, 'C', '{compte_immobilisation}', 'total', 'unique', 'OD', 'Valeur comptable de la sortie'],
+  ['cession_immo', 1, 'D', '{tresorerie}', 'total', 'unique', '{journal_tresorerie}', 'Produit de cession'],
+  ['cession_immo', 2, 'C', '8221', 'total', 'unique', '{journal_tresorerie}', 'Produit de cession'],
+];
+
 const schemasCS = [
+  ..._schemasGestion,
+  ['caution_hospitalisation', 1, 'D', '{tresorerie}', 'total', 'unique', '{journal_tresorerie}', 'Caution d’hospitalisation'],
+  ['caution_hospitalisation', 2, 'C', '4191', 'total', 'unique', '{journal_tresorerie}', 'Caution d’hospitalisation'],
+  ['imputation_caution', 1, 'D', '4191', 'total', 'unique', 'OD', 'Caution déduite de la facture'],
+  ['imputation_caution', 2, 'C', '4111', 'total', 'unique', 'OD', 'Caution déduite de la facture'],
+  ['remboursement_caution', 1, 'D', '4191', 'total', 'unique', '{journal_tresorerie}', 'Remboursement de caution'],
+  ['remboursement_caution', 2, 'C', '{tresorerie}', 'total', 'unique', '{journal_tresorerie}', 'Remboursement de caution'],
+  ['avoir', 1, 'D', '{produit}', 'total', 'unique', 'VT', 'Avoir'],
+  ['avoir', 2, 'C', '{compte_tiers}', 'total', 'unique', 'VT', 'Avoir'],
   ..._schemasCommuns,
   ['prestation_payee', 1, 'D', '{tresorerie}', 'total', 'unique', '{journal_tresorerie}', 'Prestation payée'],
   ['prestation_payee', 2, 'C', '{produit}', 'ligne', 'par_ligne', '{journal_tresorerie}', 'Prestation payée'],
@@ -165,6 +239,9 @@ const schemasCS = [
 
 const schemasONG = [
   ..._schemasCommuns,
+  ..._schemasGestion,
+  ['don_nature_transfert', 1, 'D', '4671', 'total', 'unique', 'OD', 'Don en nature transféré au centre de santé'],
+  ['don_nature_transfert', 2, 'C', '7582', 'total', 'unique', 'OD', 'Don en nature transféré au centre de santé'],
   ['don_numeraire', 1, 'D', '{tresorerie}', 'total', 'unique', '{journal_tresorerie}', 'Don reçu'],
   ['don_numeraire', 2, 'C', '7581', 'total', 'unique', '{journal_tresorerie}', 'Don reçu'],
   ['don_nature', 1, 'D', '{compte_actif}', 'total', 'unique', 'OD', 'Don en nature'],
@@ -185,7 +262,10 @@ const rolesDefaut = {
 };
 
 /// Modules de saisie (l'administrateur n'y saisit rien).
-const modulesSaisie = ['patients', 'caisse', 'actes', 'desintox', 'depenses', 'dons', 'releves'];
+const modulesSaisie = [
+  'patients', 'caisse', 'actes', 'desintox', 'depenses', 'dons', 'releves',
+  'stocks', 'achats', 'hospitalisation', 'facturation', 'paie', 'immobilisations',
+];
 const tousModules = [
   ...modulesSaisie,
   'parametrage', 'utilisateurs', 'appareils', 'sauvegardes', 'comptabilite',
@@ -213,6 +293,9 @@ Map<String, Map<String, List<String>>> droitsDefaut() {
       'audit': ['voir'],
     },
     'caissier': {
+      'hospitalisation': ['voir', 'creer'],
+      'facturation': ['voir'],
+      'stocks': ['voir'],
       'patients': ['voir', 'creer'],
       'patients_noms': ['voir'],
       'caisse': ['voir', 'creer'],
@@ -224,6 +307,8 @@ Map<String, Map<String, List<String>>> droitsDefaut() {
       'rapports': ['voir'],
     },
     'agent': {
+      'hospitalisation': ['voir', 'creer'],
+      'stocks': ['voir', 'creer'],
       'patients': ['voir', 'creer'],
       'patients_noms': ['voir'],
       'actes': ['voir', 'creer'],
@@ -232,6 +317,8 @@ Map<String, Map<String, List<String>>> droitsDefaut() {
       'releves': ['voir'],
     },
     'pharmacien': {
+      'stocks': ['voir', 'creer'],
+      'achats': ['voir', 'creer'],
       'patients': ['voir'],
       'actes': ['voir', 'creer'],
       'caisse': ['voir', 'creer'],
@@ -274,6 +361,40 @@ const parametresDefaut = {
   'sauvegarde_conservation_jours': '30',
   'sauvegarde_dossier': '',
   'version_parametrage': '1',
+  'tresorerie_minimum': '0',
+  'alerte_deficit': '1',
+  'cle_repartition': 'chiffre_affaires',
+  'sortie_stock_minimum_jours': '0',
   // Billets et pièces FCFA (billetage).
   'coupures': '10000,5000,2000,1000,500,100,50,25,10,5,1',
+};
+
+/// Taux de paie à VALIDER avec la législation en vigueur (§6.12) : ils sont
+/// datés et modifiables ; aucun n'est codé dans les calculs.
+/// [code, libellé, nature, organisme, taux pour dix mille, plafond]
+const rubriquesPaieDefaut = [
+  ['CNPS_PV_SAL', 'CNPS pension vieillesse (part salariale)', 'retenue_salariale', 'CNPS', 420, 750000],
+  ['CFC_SAL', 'Crédit foncier (part salariale)', 'retenue_salariale', 'ETAT', 100, 0],
+  ['IRPP', 'IRPP (à paramétrer selon le barème)', 'retenue_salariale', 'ETAT', 0, 0],
+  ['CNPS_PV_PAT', 'CNPS pension vieillesse (part patronale)', 'charge_patronale', 'CNPS', 420, 750000],
+  ['CNPS_PF', 'CNPS prestations familiales', 'charge_patronale', 'CNPS', 700, 750000],
+  ['CNPS_AT', 'CNPS accidents du travail', 'charge_patronale', 'CNPS', 175, 750000],
+  ['CFC_PAT', 'Crédit foncier (part patronale)', 'charge_patronale', 'ETAT', 150, 0],
+  ['FNE', 'Fonds national de l’emploi', 'charge_patronale', 'ETAT', 100, 0],
+];
+
+/// [code, libellé, compte d'immobilisation, compte d'amortissement, durée en mois]
+const categoriesImmobilisationsDefaut = [
+  ['BAT', 'Bâtiments', '2311', '2831', 240],
+  ['MED', 'Matériel médical et technique', '2411', '2841', 60],
+  ['INFO', 'Matériel informatique', '2442', '2844', 36],
+  ['MOB', 'Mobilier de bureau', '2444', '2844', 120],
+  ['TRANS', 'Matériel de transport', '2451', '2845', 48],
+];
+
+/// Stocks : comptes par magasin. [stock, libellé, compte de stock, variation, achat, vente, activité]
+const magasinsDefaut = {
+  'PHM': ['Pharmacie moderne', '3111', '6031', '6011', '7011', 'PHM'],
+  'PHT': ['Pharmacie traditionnelle', '3112', '6031', '6012', '7012', 'PHT'],
+  'LAB': ['Réactifs du laboratoire', '3311', '6033', '6041', '', 'LAB'],
 };

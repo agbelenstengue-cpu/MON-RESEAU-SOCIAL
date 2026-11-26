@@ -17,6 +17,7 @@ import '../modules/tresorerie/tresorerie.dart';
 import '../noyau/base.dart';
 import '../noyau/operations.dart';
 import '../noyau/outils.dart';
+import '../rapports/modele.dart';
 
 // Présentation sobre : noir, gris, un seul trait de couleur institutionnelle.
 const _vert = PdfColor.fromInt(0xFF1F4D36);
@@ -68,12 +69,13 @@ class Documents {
   }
 
   /// Page A4 avec, si l'option est active, le logo de la structure en filigrane.
-  static pw.PageTheme _page(Base base, String entite, {pw.EdgeInsets marge = const pw.EdgeInsets.fromLTRB(36, 32, 36, 24)}) {
+  static pw.PageTheme _page(Base base, String entite,
+      {pw.EdgeInsets marge = const pw.EdgeInsets.fromLTRB(36, 32, 36, 24), PdfPageFormat format = PdfPageFormat.a4}) {
     final e = base.ligne('SELECT logo, filigrane FROM entites WHERE code=?', [entite]);
     final logo = e?['logo'] as Uint8List?;
     final filigrane = logo != null && e?['filigrane'] == 1;
     return pw.PageTheme(
-      pageFormat: PdfPageFormat.a4,
+      pageFormat: format,
       margin: marge,
       theme: _theme(),
       buildBackground: filigrane
@@ -523,6 +525,92 @@ class Documents {
         pw.SizedBox(height: 8),
         pw.Center(child: pw.Text('Document généré par AH2 Gestion', style: const pw.TextStyle(fontSize: 8))),
       ]),
+    ));
+    return doc.save();
+  }
+
+  // ============================================================ RAPPORT GÉNÉRIQUE
+
+  /// Tout rapport ou état (§8) : entête, filigrane, tableaux, totaux, synthèse.
+  static Future<Uint8List> rapport(Base base, Rapport r) async {
+    final doc = pw.Document(title: r.titre);
+    final genere = base.maintenant;
+    pw.Widget tableau(Section s) {
+      final t = s.ligneTotal;
+      pw.Widget cel(Object? v, Colonne c, {bool gras = false, bool entete = false}) => pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 2.5),
+            child: pw.Text(entete ? c.titre : cellule(v, c.type),
+                textAlign: c.aDroite ? pw.TextAlign.right : pw.TextAlign.left,
+                style: pw.TextStyle(
+                    fontSize: entete ? 7.5 : 8,
+                    color: entete ? PdfColors.white : null,
+                    fontWeight: gras || entete ? pw.FontWeight.bold : null)),
+          );
+      return pw.Table(
+        border: pw.TableBorder.all(color: _bord, width: 0.5),
+        columnWidths: {for (var i = 0; i < s.colonnes.length; i++) i: pw.FlexColumnWidth(s.colonnes[i].poids)},
+        children: [
+          pw.TableRow(
+              repeat: true,
+              decoration: const pw.BoxDecoration(color: _sombre),
+              children: [for (final c in s.colonnes) cel(null, c, entete: true)]),
+          for (var r = 0; r < s.lignes.length; r++)
+            pw.TableRow(
+              decoration: pw.BoxDecoration(color: r.isOdd ? _gris : null),
+              children: [for (var i = 0; i < s.colonnes.length; i++) cel(i < s.lignes[r].length ? s.lignes[r][i] : null, s.colonnes[i])],
+            ),
+          if (t != null)
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFE4E4E4)),
+              children: [for (var i = 0; i < s.colonnes.length; i++) cel(i < t.length ? t[i] : null, s.colonnes[i], gras: true)],
+            ),
+        ],
+      );
+    }
+
+    doc.addPage(pw.MultiPage(
+      pageTheme: _page(base, r.entite,
+          format: r.paysage ? PdfPageFormat.a4.landscape : PdfPageFormat.a4, marge: const pw.EdgeInsets.fromLTRB(30, 28, 30, 22)),
+      header: (c) => c.pageNumber == 1 ? _entete(base, r.entite) : pw.SizedBox(),
+      footer: (c) => _pied(c, r.titre),
+      build: (c) => [
+        pw.SizedBox(height: 10),
+        pw.Center(child: pw.Text(r.titre.toUpperCase(), style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold))),
+        pw.SizedBox(height: 4),
+        pw.Center(child: pw.Text(r.periode, style: const pw.TextStyle(fontSize: 10))),
+        for (final f in r.filtres) pw.Center(child: pw.Text(f, style: const pw.TextStyle(fontSize: 9))),
+        pw.Center(child: pw.Text('Édité le ${dateFr(genere)} à ${heureFr(genere)}', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700))),
+        if (r.note != null) ...[
+          pw.SizedBox(height: 8),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(border: pw.Border.all(color: _bord)),
+            child: pw.Text(r.note!, style: const pw.TextStyle(fontSize: 9.5)),
+          ),
+        ],
+        for (final s in r.sections) ...[
+          pw.SizedBox(height: 10),
+          if (s.titre != null)
+            pw.Padding(padding: const pw.EdgeInsets.only(bottom: 4), child: pw.Text(s.titre!, style: pw.TextStyle(fontSize: 10.5, fontWeight: pw.FontWeight.bold))),
+          if (s.lignes.isEmpty)
+            pw.Text('Aucune donnée pour cette période.', style: const pw.TextStyle(fontSize: 9))
+          else
+            tableau(s),
+        ],
+        if (r.synthese.isNotEmpty) ...[
+          pw.SizedBox(height: 10),
+          pw.Align(alignment: pw.Alignment.centerRight, child: _synthese('Synthèse', r.synthese, largeur: 260)),
+        ],
+        if (r.signatures.isNotEmpty) ...[
+          pw.SizedBox(height: 18),
+          pw.Row(children: [
+            for (var i = 0; i < r.signatures.length; i++) ...[
+              if (i > 0) pw.SizedBox(width: 12),
+              _cadreSignature(r.signatures[i], ['Nom', 'Date', 'Signature']),
+            ],
+          ]),
+        ],
+      ],
     ));
     return doc.save();
   }

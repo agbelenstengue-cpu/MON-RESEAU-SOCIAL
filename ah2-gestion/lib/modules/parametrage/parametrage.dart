@@ -21,6 +21,7 @@ class Parametrage {
     'parametres', 'entites', 'roles', 'droits', 'comptes', 'journaux', 'activites',
     'tresoreries', 'actes_catalogue', 'tarifs', 'programmes_desintox',
     'schemas_ecritures', 'utilisateurs', 'appareils',
+    'produits', 'lits', 'rubriques_paie', 'categories_immobilisations',
   ];
 
   static String _cleAleatoire() {
@@ -110,7 +111,59 @@ class Parametrage {
           [base.appareil, nomAppareil, _cleAleatoire()]);
       _insererUtilisateur(base, identifiantAdmin, nomAdmin, 'admin', motDePasseAdmin, null, null);
       base.exec("INSERT INTO etat_sync(cle, valeur) VALUES ('installe_le', ?)", [base.maintenant.toIso8601String()]);
+      completerReferentiels(base);
       Audit.tracer(base, utilisateur: 'installation', action: 'installation', objet: 'PC central ${base.appareil}');
+    });
+  }
+
+  /// Ajoute, sans rien écraser, les éléments de paramétrage apportés par une
+  /// nouvelle version du logiciel (comptes, journaux, schémas, droits,
+  /// paramètres, taux de paie, catégories d'immobilisations). Appelé à
+  /// l'installation et à chaque démarrage du PC central : une mise à jour
+  /// complète le paramétrage sans toucher à ce que le comptable a modifié.
+  static void completerReferentiels(Base base) {
+    if (base.entier('SELECT COUNT(*) FROM entites') == 0) return;
+    base.transaction(() {
+      final avant = base.entier('SELECT total_changes()');
+      void comptes(String ent, List<CompteDefaut> liste) {
+        final ref = base.valeur('SELECT referentiel FROM entites WHERE code=?', [ent]);
+        for (final c in liste) {
+          base.exec('INSERT OR IGNORE INTO comptes(entite, numero, libelle, origine) VALUES (?,?,?,?)', [ent, c.numero, c.libelle, ref]);
+        }
+      }
+
+      comptes('CS', comptesCS);
+      comptes('ONG', comptesONG);
+      for (final ent in ['CS', 'ONG']) {
+        for (final j in journauxDefaut) {
+          base.exec('INSERT OR IGNORE INTO journaux(entite, code, libelle, type) VALUES (?,?,?,?)', [ent, j[0], j[1], j[2]]);
+        }
+        for (final sc in ent == 'CS' ? schemasCS : schemasONG) {
+          base.exec(
+              'INSERT OR IGNORE INTO schemas_ecritures(entite, type_ecriture, ordre, sens, compte, montant, repetition, journal, libelle) '
+              'VALUES (?,?,?,?,?,?,?,?,?)',
+              [ent, ...sc]);
+        }
+      }
+      rolesDefaut.forEach((code, lib) => base.exec('INSERT OR IGNORE INTO roles(code, libelle) VALUES (?,?)', [code, lib]));
+      droitsDefaut().forEach((role, modules) => modules.forEach((module, actions) {
+            for (final a in actions) {
+              base.exec('INSERT OR IGNORE INTO droits(role, module, action) VALUES (?,?,?)', [role, module, a]);
+            }
+          }));
+      parametresDefaut.forEach((k, v) => base.exec('INSERT OR IGNORE INTO parametres(cle, valeur) VALUES (?,?)', [k, v]));
+      for (final r in rubriquesPaieDefaut) {
+        base.exec(
+            "INSERT OR IGNORE INTO rubriques_paie(code, depuis, libelle, nature, organisme, taux, plafond) VALUES (?,'2000-01-01',?,?,?,?,?)", r);
+      }
+      for (final c in categoriesImmobilisationsDefaut) {
+        base.exec(
+            'INSERT OR IGNORE INTO categories_immobilisations(code, libelle, compte_immobilisation, compte_amortissement, duree_mois) VALUES (?,?,?,?,?)',
+            c);
+      }
+      if (base.entier('SELECT total_changes()') != avant && base.valeur('SELECT 1 FROM parametres WHERE cle=?', ['version_parametrage']) != null) {
+        _versionSuivante(base);
+      }
     });
   }
 

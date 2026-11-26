@@ -4,6 +4,7 @@ library;
 import '../noyau/operations.dart';
 import 'actes/actes.dart';
 import 'cloture/cloture.dart';
+import 'comptabilite/comptabilite.dart';
 import 'desintox/desintox.dart';
 import 'dons/dons.dart';
 import 'patients/patients.dart';
@@ -24,4 +25,5 @@ void initialiserModules() {
   Dons.declarer();
   Cloture.declarer();
   Releves.declarer();
+  Comptabilite.declarer();
 }

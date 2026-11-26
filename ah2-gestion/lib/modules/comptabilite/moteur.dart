@@ -102,6 +102,39 @@ class Moteur {
     return id;
   }
 
+  /// Écriture saisie librement (opérations diverses, à-nouveaux, clôture) :
+  /// contrôle débit = crédit et existence des comptes.
+  static int ecrireLibre(Base base, Operation op,
+      {required String entite, required String journal, required String libelle, required List<Map> lignes, String? date}) {
+    if (lignes.length < 2) throw const RegleMetier('Une écriture comporte au moins deux lignes.');
+    var d = 0, c = 0;
+    for (final l in lignes) {
+      final de = (l['debit'] as int?) ?? 0, cr = (l['credit'] as int?) ?? 0;
+      if (de < 0 || cr < 0 || (de > 0 && cr > 0) || (de == 0 && cr == 0)) {
+        throw const RegleMetier('Chaque ligne a soit un débit, soit un crédit, positif.');
+      }
+      d += de;
+      c += cr;
+      if (base.valeur('SELECT 1 FROM comptes WHERE entite=? AND numero=? AND actif=1', [entite, l['compte']]) == null) {
+        throw RegleMetier("Le compte ${l['compte']} n'existe pas dans le plan comptable de l'entité $entite.");
+      }
+    }
+    if (d != c) throw RegleMetier('Écriture déséquilibrée : débit ${fcfa(d)}, crédit ${fcfa(c)}.');
+    if (base.valeur('SELECT 1 FROM journaux WHERE entite=? AND code=?', [entite, journal]) == null) {
+      throw RegleMetier("Le journal $journal n'existe pas pour l'entité $entite.");
+    }
+    base.exec(
+        'INSERT INTO ecritures(uuid_op, entite, journal, date, libelle, piece, utilisateur, appareil) VALUES (?,?,?,?,?,?,?,?)',
+        [op.uuid, entite, journal, date ?? op.dateOp, libelle, op.piece, op.utilisateur, op.appareil]);
+    final id = base.db.lastInsertRowId;
+    for (final l in lignes) {
+      base.exec(
+          'INSERT INTO lignes_ecriture(ecriture, compte, debit, credit, activite, subvention, tiers) VALUES (?,?,?,?,?,?,?)',
+          [id, l['compte'], l['debit'] ?? 0, l['credit'] ?? 0, l['activite'], l['subvention'], l['tiers']]);
+    }
+    return id;
+  }
+
   /// Contre-passe (inverse) toutes les écritures produites par [cible].
   static void contrePasser(Base base, Operation cible, Operation annulation) {
     final ecr = base.lignes('SELECT * FROM ecritures WHERE uuid_op=? AND contre_passation=0', [cible.uuid]);

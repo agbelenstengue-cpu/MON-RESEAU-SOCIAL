@@ -54,14 +54,21 @@ class Base {
   }
 
   void _migrer() {
-    final v = db.select('PRAGMA user_version').first.values.first as int;
+    var v = db.select('PRAGMA user_version').first.values.first as int;
     if (v == 0) {
       transaction(() {
         db.execute(schemaSql);
-        db.execute('PRAGMA user_version = $versionSchema');
+        db.execute('PRAGMA user_version = 1');
+      });
+      v = 1;
+    }
+    // Mises à jour : uniquement des ajouts, aucune donnée n'est perdue.
+    for (var cible = v + 1; cible <= versionSchema; cible++) {
+      transaction(() {
+        db.execute(migrations[cible]!);
+        db.execute('PRAGMA user_version = $cible');
       });
     }
-    // Les migrations futures (v1 -> v2…) s'ajouteront ici.
   }
 
   /// Exécute [action] de façon atomique. Les appels imbriqués utilisent des

@@ -9,7 +9,9 @@
 ///    l'identique sur chaque appareil à partir des opérations.
 library;
 
-const int versionSchema = 1;
+/// Version du schéma. Une mise à jour du logiciel n'efface jamais rien :
+/// chaque nouvelle version ajoute des tables ou des colonnes (voir [migrations]).
+const int versionSchema = 2;
 
 const String schemaSql = r'''
 -- ============================== PARAMÉTRAGE ==============================
@@ -479,3 +481,198 @@ CREATE TABLE etat_sync (
   valeur TEXT NOT NULL
 ) STRICT;
 ''';
+
+/// Migrations successives, appliquées dans l'ordre et dans une transaction.
+/// Règle : uniquement des ajouts (CREATE TABLE, ALTER TABLE ADD COLUMN),
+/// jamais de suppression de données.
+const Map<int, String> migrations = {
+  2: r"""
+-- ---------- Comptabilité : rapprochement bancaire, lettrage, analytique
+CREATE TABLE releves_bancaires (
+  uuid_op TEXT PRIMARY KEY,
+  tresorerie TEXT NOT NULL,
+  date TEXT NOT NULL,
+  solde INTEGER NOT NULL,
+  reference TEXT NOT NULL DEFAULT ''
+) STRICT;
+CREATE TABLE pointages (
+  mouvement TEXT PRIMARY KEY,       -- uuid de l'opération + ':' + rang du mouvement
+  uuid_op TEXT NOT NULL,
+  releve TEXT
+) STRICT;
+CREATE TABLE lettrages (
+  ligne TEXT PRIMARY KEY,           -- uuid de l'opération + ':' + rang de la ligne
+  code TEXT NOT NULL,
+  uuid_op TEXT NOT NULL
+) STRICT;
+
+-- ---------- Stocks (pharmacies moderne et traditionnelle, réactifs du laboratoire)
+CREATE TABLE produits (
+  code TEXT PRIMARY KEY,
+  designation TEXT NOT NULL,
+  stock TEXT NOT NULL,              -- PHM, PHT ou LAB
+  forme TEXT NOT NULL DEFAULT '',
+  dosage TEXT NOT NULL DEFAULT '',
+  unite TEXT NOT NULL DEFAULT 'unité',
+  prix_vente INTEGER NOT NULL DEFAULT 0,
+  stock_minimum INTEGER NOT NULL DEFAULT 0,
+  producteur TEXT NOT NULL DEFAULT '',
+  origine TEXT NOT NULL DEFAULT '',
+  preparation TEXT NOT NULL DEFAULT '',
+  actif INTEGER NOT NULL DEFAULT 1
+) STRICT;
+CREATE TABLE mouvements_stock (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uuid_op TEXT NOT NULL,
+  rang INTEGER NOT NULL,
+  produit TEXT NOT NULL,
+  lot TEXT NOT NULL,
+  peremption TEXT,
+  date TEXT NOT NULL,
+  horodatage TEXT NOT NULL,
+  quantite INTEGER NOT NULL,        -- positive = entrée, négative = sortie
+  cout_unitaire INTEGER NOT NULL,   -- CUMP (sorties) ou coût d'achat (entrées)
+  type TEXT NOT NULL,
+  reference TEXT,
+  annule INTEGER NOT NULL DEFAULT 0
+) STRICT;
+CREATE INDEX mouvements_stock_produit ON mouvements_stock(produit, lot);
+CREATE TABLE inventaires (
+  uuid_op TEXT PRIMARY KEY,
+  stock TEXT NOT NULL,
+  date TEXT NOT NULL,
+  lignes TEXT NOT NULL
+) STRICT;
+
+-- ---------- Fournisseurs et achats
+CREATE TABLE fournisseurs (
+  id TEXT PRIMARY KEY,
+  nom TEXT NOT NULL,
+  contact TEXT NOT NULL DEFAULT '',
+  adresse TEXT NOT NULL DEFAULT '',
+  uuid_op TEXT NOT NULL
+) STRICT;
+CREATE TABLE commandes (
+  uuid_op TEXT PRIMARY KEY,
+  piece TEXT NOT NULL,
+  fournisseur TEXT NOT NULL,
+  date TEXT NOT NULL,
+  lignes TEXT NOT NULL,
+  statut TEXT NOT NULL DEFAULT 'envoyee'
+) STRICT;
+
+-- ---------- Hospitalisation
+CREATE TABLE lits (
+  code TEXT PRIMARY KEY,
+  chambre TEXT NOT NULL,
+  categorie TEXT NOT NULL,
+  tarif_journalier INTEGER NOT NULL,
+  actif INTEGER NOT NULL DEFAULT 1
+) STRICT;
+CREATE TABLE sejours (
+  id TEXT PRIMARY KEY,
+  numero TEXT NOT NULL UNIQUE,
+  patient TEXT NOT NULL,
+  lit TEXT NOT NULL,
+  date_entree TEXT NOT NULL,
+  tarif_journalier INTEGER NOT NULL,
+  caution INTEGER NOT NULL DEFAULT 0,
+  date_sortie TEXT,
+  journees INTEGER,
+  uuid_op TEXT NOT NULL
+) STRICT;
+
+-- ---------- Massages : carnets de séances
+CREATE TABLE carnets (
+  id TEXT PRIMARY KEY,
+  patient TEXT,
+  acte TEXT NOT NULL,
+  seances INTEGER NOT NULL,
+  consommees INTEGER NOT NULL DEFAULT 0,
+  montant INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  uuid_op TEXT NOT NULL
+) STRICT;
+
+-- ---------- Personnel et paie
+CREATE TABLE employes (
+  id TEXT PRIMARY KEY,
+  matricule TEXT NOT NULL UNIQUE,
+  nom TEXT NOT NULL,
+  poste TEXT NOT NULL DEFAULT '',
+  activite TEXT,
+  entite TEXT NOT NULL,
+  embauche TEXT,
+  contrat TEXT NOT NULL DEFAULT '',
+  statut TEXT NOT NULL DEFAULT 'salarie',     -- salarie ou benevole
+  salaire_base INTEGER NOT NULL DEFAULT 0,
+  primes INTEGER NOT NULL DEFAULT 0,
+  cnps TEXT NOT NULL DEFAULT '',
+  paiement TEXT NOT NULL DEFAULT '',
+  actif INTEGER NOT NULL DEFAULT 1,
+  uuid_op TEXT NOT NULL
+) STRICT;
+-- Rubriques de paie paramétrables et datées (aucun taux codé en dur).
+CREATE TABLE rubriques_paie (
+  code TEXT NOT NULL,
+  depuis TEXT NOT NULL,
+  libelle TEXT NOT NULL,
+  nature TEXT NOT NULL CHECK (nature IN ('retenue_salariale','charge_patronale')),
+  organisme TEXT NOT NULL CHECK (organisme IN ('CNPS','ETAT')),
+  taux INTEGER NOT NULL,            -- taux en pour dix mille (420 = 4,20 %)
+  plafond INTEGER NOT NULL DEFAULT 0, -- base plafonnée (0 = pas de plafond)
+  actif INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (code, depuis)
+) STRICT;
+CREATE TABLE bulletins (
+  id TEXT PRIMARY KEY,              -- employé + période
+  uuid_op TEXT NOT NULL,
+  employe TEXT NOT NULL,
+  periode TEXT NOT NULL,
+  brut INTEGER NOT NULL,
+  retenues INTEGER NOT NULL,
+  avances INTEGER NOT NULL,
+  net INTEGER NOT NULL,
+  patronales INTEGER NOT NULL,
+  detail TEXT NOT NULL,
+  annule INTEGER NOT NULL DEFAULT 0
+) STRICT;
+CREATE TABLE conges (
+  uuid_op TEXT PRIMARY KEY,
+  employe TEXT NOT NULL,
+  debut TEXT NOT NULL,
+  fin TEXT NOT NULL,
+  motif TEXT NOT NULL DEFAULT ''
+) STRICT;
+
+-- ---------- Immobilisations
+CREATE TABLE categories_immobilisations (
+  code TEXT PRIMARY KEY,
+  libelle TEXT NOT NULL,
+  compte_immobilisation TEXT NOT NULL,
+  compte_amortissement TEXT NOT NULL,
+  duree_mois INTEGER NOT NULL
+) STRICT;
+CREATE TABLE immobilisations (
+  id TEXT PRIMARY KEY,
+  numero TEXT NOT NULL UNIQUE,
+  designation TEXT NOT NULL,
+  categorie TEXT NOT NULL,
+  entite TEXT NOT NULL,
+  date_acquisition TEXT NOT NULL,
+  valeur INTEGER NOT NULL,
+  origine TEXT NOT NULL,            -- achat ou don
+  localisation TEXT NOT NULL DEFAULT '',
+  activite TEXT,
+  duree_mois INTEGER NOT NULL,
+  amorti INTEGER NOT NULL DEFAULT 0,
+  date_sortie TEXT,
+  motif_sortie TEXT,
+  uuid_op TEXT NOT NULL
+) STRICT;
+
+-- ---------- Désintoxication : médicaments facturés en plus du forfait
+ALTER TABLE desintox_dossiers ADD COLUMN medicaments_factures INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE desintox_dossiers ADD COLUMN medicaments_compris INTEGER NOT NULL DEFAULT 0;
+""",
+};

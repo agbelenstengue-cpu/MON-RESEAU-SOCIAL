@@ -205,6 +205,34 @@ class Rapports {
         r.add({'niveau': 'orange', 'titre': 'Appareil non synchronisé', 'detail': '${a['code']} · ${d == null ? 'jamais' : 'depuis ${dateFr(DateTime.parse(d))} ${heureFr(DateTime.parse(d))}'}'});
       }
     }
+    // Déficits : résultat du mois, activités déficitaires, trésorerie sous le minimum.
+    if (base.param('alerte_deficit', '1') == '1') {
+      final debutMois = '${aujourdhui.substring(0, 7)}-01';
+      for (final ent in ['CS', 'ONG']) {
+        final nom = ent == 'CS' ? 'Centre de santé' : 'ONG';
+        int somme(String racine, [String? activite]) => base.entier(
+            "SELECT COALESCE(SUM(l.debit-l.credit),0) FROM lignes_ecriture l JOIN ecritures e ON e.id=l.ecriture "
+            "WHERE e.entite=? AND e.date BETWEEN ? AND ? AND e.journal <> 'CL' AND l.compte LIKE ? ${activite != null ? 'AND l.activite=?' : ''}",
+            [ent, debutMois, aujourdhui, '$racine%', ?activite]);
+        final resultat = -somme('7') - somme('6');
+        if (resultat < 0) {
+          r.add({'niveau': 'rouge', 'titre': 'Déficit du mois : $nom', 'detail': 'Charges supérieures aux recettes de ${fcfa(-resultat)} depuis le 1er du mois'});
+        }
+        for (final a in base.lignes("SELECT code, libelle FROM activites WHERE entite=? AND actif=1 AND code NOT LIKE 'ADM%'", [ent])) {
+          final ra = -somme('7', a['code'] as String) - somme('6', a['code'] as String);
+          if (ra < 0) {
+            r.add({'niveau': 'orange', 'titre': 'Activité déficitaire ce mois', 'detail': '${a['libelle']} : ${fcfa(ra)} (charges directes supérieures aux recettes)'});
+          }
+        }
+        final minimum = base.paramInt('tresorerie_minimum', 0);
+        if (minimum > 0) {
+          final total = base.lignes('SELECT id FROM tresoreries WHERE entite=? AND actif=1', [ent]).fold<int>(0, (t, x) => t + Tresorerie.solde(base, x['id'] as String));
+          if (total < minimum) {
+            r.add({'niveau': 'rouge', 'titre': 'Trésorerie insuffisante : $nom', 'detail': 'Disponible ${fcfa(total)} pour un minimum fixé à ${fcfa(minimum)}'});
+          }
+        }
+      }
+    }
     final sauvegarde = base.valeur("SELECT valeur FROM etat_sync WHERE cle='derniere_sauvegarde'") as String?;
     final estCentral = base.valeur('SELECT central FROM appareils WHERE code=?', [base.appareil]) == 1;
     if (estCentral && (sauvegarde == null || sauvegarde.isEmpty || base.maintenant.difference(DateTime.parse(sauvegarde)).inHours > 24)) {

@@ -16,6 +16,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'modules/modules.dart';
+import 'modules/parametrage/parametrage.dart';
 import 'noyau/base.dart';
 import 'pdf/documents.dart';
 import 'ui/app.dart';
@@ -51,6 +52,8 @@ Future<void> ouvrirBaseLocale(EtatApp etat) async {
   }
   final appareil = await _codeAppareil(dossier.path);
   final base = Base.ouvrir(chemin: chemin, appareil: appareil ?? 'NOUVEAU', cle: cle);
+  // Mise à jour du logiciel : le paramétrage est complété, jamais écrasé.
+  if (Parametrage.estCentral(base)) Parametrage.completerReferentiels(base);
   etat.ouvrir(base, chemin, cle: cle);
   await etat.demarrerServices();
 }

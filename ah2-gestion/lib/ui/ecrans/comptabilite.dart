@@ -12,6 +12,7 @@ import '../../noyau/outils.dart';
 import '../etat_app.dart';
 import '../theme.dart';
 import '../widgets/commun.dart';
+import 'compta_outils.dart';
 
 class EcranComptabilite extends StatefulWidget {
   const EcranComptabilite({super.key});
@@ -28,6 +29,9 @@ class _EcranComptabiliteState extends State<EcranComptabilite> {
     final s = etat.session!;
     final onglets = [
       ('Écritures', _ecritures),
+      ('Saisie et clôture', (c) => SaisieEcriture(key: ValueKey('s$_entite'), entite: _entite)),
+      ('Rapprochement bancaire', (c) => Rapprochement(key: ValueKey('r$_entite'), entite: _entite)),
+      ('Lettrage', (c) => Lettrage(entite: _entite)),
       ('Balance', _balance),
       ('Clôtures', _clotures),
       ('Anomalies', _anomalies),
