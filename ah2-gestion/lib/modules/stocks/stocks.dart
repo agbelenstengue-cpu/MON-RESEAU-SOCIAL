@@ -70,6 +70,19 @@ class Stocks {
             [c, designation.trim(), stock, forme, dosage, unite, prixVente, stockMinimum, producteur, origine, preparation]);
       }, nouveau: {'designation': designation, 'prix': prixVente});
 
+  /// Prix du litre d'un remède (AE, SE…) : réservé au paramétrage (comptable).
+  /// Le changement est daté dans le journal d'audit ; les quantités déjà
+  /// servies gardent le coût de leur jour.
+  static void prixLitre(Session s, String code, int prix) {
+    final ancien = s.base.valeur('SELECT prix_vente FROM produits WHERE code=? AND remede=1', [code]) ??
+        (throw const RegleMetier('Remède introuvable.'));
+    if (prix <= 0) throw const RegleMetier('Le prix du litre doit être positif.');
+    Parametrage.modifier(s, 'parametrage', 'prix_litre:$code',
+        () => s.base.exec('UPDATE produits SET prix_vente=? WHERE code=?', [prix, code]), ancien: {'prix': ancien}, nouveau: {'prix': prix});
+  }
+
+  static List<Ligne> remedes(Base b) => b.lignes('SELECT * FROM produits WHERE remede=1 AND actif=1 ORDER BY code');
+
   static String retirerProduit(Session s, String code) => Parametrage.modifier(s, 'stocks', 'produit:$code', () {
         final b = s.base;
         if (b.valeur('SELECT 1 FROM mouvements_stock WHERE produit=? LIMIT 1', [code]) != null) {
@@ -174,10 +187,24 @@ class Stocks {
       String? fournisseur,
       String? donateur,
       String? commande,
-      String? facture}) {
+      String? facture,
+      String? payeComptant}) {
     final b = s.base;
     return b.transaction(() {
       magasin(stock);
+      final jour = dateIso(b.maintenant);
+      lignes = [
+        for (final l in lignes)
+          () {
+            final p = produit(b, l.produit);
+            if (p['remede'] != 1) return l;
+            // Remède : seuls les litres reçus comptent ; coût = prix du litre fixé par le comptable.
+            return LigneStock(l.produit, l.quantite,
+                lot: (l.lot ?? '').trim().isEmpty ? 'R-$jour' : l.lot,
+                peremption: l.peremption,
+                coutUnitaire: l.coutUnitaire > 0 ? l.coutUnitaire : p['prix_vente'] as int);
+          }(),
+      ];
       if (!['achat', 'don', 'retour'].contains(origine)) throw const RegleMetier('Origine : achat, don ou retour.');
       if (origine == 'achat' && fournisseur == null) throw const RegleMetier('Choisissez le fournisseur.');
       if (origine == 'don' && donateur == null) throw const RegleMetier('Choisissez le donateur.');
@@ -187,9 +214,9 @@ class Stocks {
         if (p['stock'] != stock) throw RegleMetier('${p['designation']} n’appartient pas à ce stock.');
         if (l.quantite <= 0 || l.coutUnitaire < 0) throw const RegleMetier('Quantité ou coût invalide.');
         if ((l.lot ?? '').trim().isEmpty) throw RegleMetier('Numéro de lot obligatoire pour ${p['designation']}.');
-        if (stock != 'LAB' && l.peremption == null) throw RegleMetier('Date de péremption obligatoire pour ${p['designation']}.');
+        if (stock != 'LAB' && p['remede'] != 1 && l.peremption == null) throw RegleMetier('Date de péremption obligatoire pour ${p['designation']}.');
       }
-      return Operations.enregistrer(s, type: 'stock_entree', entite: 'CS', typePiece: 'ENT', donnees: {
+      final op = Operations.enregistrer(s, type: 'stock_entree', entite: 'CS', typePiece: 'ENT', donnees: {
         'stock': stock,
         'origine': origine,
         'fournisseur': fournisseur,
@@ -198,6 +225,40 @@ class Stocks {
         'facture': facture,
         'lignes': [
           for (final l in lignes) {'produit': l.produit, 'quantite': l.quantite, 'lot': l.lot!.trim(), 'peremption': l.peremption, 'cout': l.coutUnitaire}
+        ],
+      });
+      // Achat payé comptant : le règlement suit immédiatement la réception.
+      final total = lignes.fold<int>(0, (t, l) => t + l.quantite * l.coutUnitaire);
+      if (origine == 'achat' && payeComptant != null && total > 0) {
+        reglerFournisseur(s, fournisseur: fournisseur!, montant: total, mode: payeComptant);
+      }
+      return op;
+    });
+  }
+
+  /// Distribution d'un remède (AE, SE…) aux patients internés : par exemple
+  /// 10 litres servis, 1 litre par patient. Le coût est compris dans
+  /// l'abonnement et imputé à chaque dossier (fiche de suivi).
+  static Operation servirRemede(Session s, {required String produit, required Map<String, int> parDossier}) {
+    final b = s.base;
+    return b.transaction(() {
+      final p = Stocks.produit(b, produit);
+      if (parDossier.isEmpty) throw const RegleMetier('Aucun patient sélectionné.');
+      final total = parDossier.values.fold<int>(0, (t, q) => t + q);
+      if (parDossier.values.any((q) => q < 0) || total <= 0) throw const RegleMetier('Quantités invalides.');
+      final c = cump(b, produit);
+      final cout = c > 0 ? c : p['prix_vente'] as int;
+      final lots = repartirFefo(b, produit, total);
+      return Operations.enregistrer(s, type: 'distribution_remede', entite: 'CS', typePiece: 'SOR', donnees: {
+        'produit': produit,
+        'designation': p['designation'],
+        'stock': p['stock'],
+        'unite': p['unite'],
+        'cout': cout,
+        'lots': [for (final (lot, q) in lots) {'lot': lot, 'quantite': q}],
+        'patients': [
+          for (final e in parDossier.entries)
+            if (e.value > 0) {'dossier': e.key, 'patient': b.valeur('SELECT patient FROM desintox_dossiers WHERE id=?', [e.key]), 'quantite': e.value}
         ],
       });
     });
@@ -354,6 +415,7 @@ class Stocks {
     Operations.declarer(_Sortie());
     Operations.declarer(_Inventaire());
     Operations.declarer(_ReglementFournisseur());
+    Operations.declarer(_DistributionRemede());
   }
 }
 
@@ -481,6 +543,17 @@ class _Sortie extends TypeOperation {
       }
     }
     final dossier = op.d<String?>('dossier');
+    final sejour = op.d<String?>('sejour');
+    if (dossier != null || sejour != null) {
+      final unites = {for (final x in base.lignes('SELECT code, unite FROM produits')) x['code']: x['unite']};
+      for (final l in lignes) {
+        base.exec(
+            'INSERT INTO consommations(uuid_op, dossier, sejour, patient, produit, designation, quantite, unite, cout, montant, facture, date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+            [op.uuid, dossier, sejour, op.d('patient'), l['produit'], l['designation'], l['quantite'], unites[l['produit']] ?? 'unité',
+              (l['quantite'] as int) * (l['cout'] as int), op.d<bool>('facturer') ? (l['prix'] as int) * (l['quantite'] as int) : 0,
+              op.d<bool>('facturer') ? 1 : 0, op.dateOp]);
+      }
+    }
     if (dossier != null) {
       if (op.d<bool>('facturer')) {
         base.exec('UPDATE desintox_dossiers SET medicaments_factures = medicaments_factures + ? WHERE id=?', [total, dossier]);
@@ -493,6 +566,7 @@ class _Sortie extends TypeOperation {
   @override
   void annuler(Base base, Operation cible, Operation annulation) {
     base.exec('UPDATE mouvements_stock SET annule=1 WHERE uuid_op=?', [cible.uuid]);
+    base.exec('UPDATE consommations SET annule=1 WHERE uuid_op=?', [cible.uuid]);
     final dossier = cible.d<String?>('dossier');
     if (dossier != null) {
       final cout = cible.d<List>('lignes').cast<Map>().fold<int>(0, (t, l) => t + (l['quantite'] as int) * (l['cout'] as int));
@@ -551,5 +625,50 @@ class _ReglementFournisseur extends TypeOperation {
     Moteur.generer(base, op, 'reglement_fournisseur',
         total: m, variables: Tresorerie.variables(base, treso), tiers: op.d('fournisseur'), libelle: 'Règlement $nom ${op.piece}');
     Tresorerie.mouvement(base, op, treso, -m, 'Règlement fournisseur $nom', reference: op.d('reference'));
+  }
+}
+
+class _DistributionRemede extends TypeOperation {
+  @override
+  String get type => 'distribution_remede';
+  @override
+  String get module => 'desintox';
+  @override
+  String get libelle => 'Distribution de remède';
+
+  @override
+  void appliquer(Base base, Operation op) {
+    final cout = op.d<int>('cout');
+    var rang = 0;
+    for (final l in op.d<List>('lots').cast<Map>()) {
+      _mouvement(base, op, ++rang, {'produit': op.d('produit'), 'lot': l['lot'], 'peremption': null, 'cout': cout}, -(l['quantite'] as int),
+          'delivrance_desintox');
+      if (Stocks.quantite(base, op.d('produit'), lot: l['lot'] as String) < 0) {
+        Operations.signalerAnomalie(base, 'conflit_stock', op.uuid, 'Stock négatif de ${op.d('designation')} après la distribution ${op.piece}.');
+      }
+    }
+    var total = 0;
+    for (final p in op.d<List>('patients').cast<Map>()) {
+      final q = p['quantite'] as int;
+      total += q * cout;
+      base.exec(
+          'INSERT INTO consommations(uuid_op, dossier, patient, produit, designation, quantite, unite, cout, facture, date) VALUES (?,?,?,?,?,?,?,?,0,?)',
+          [op.uuid, p['dossier'], p['patient'], op.d('produit'), op.d('designation'), q, op.d('unite'), q * cout, op.dateOp]);
+      base.exec('UPDATE desintox_dossiers SET medicaments_compris = medicaments_compris + ? WHERE id=?', [q * cout, p['dossier']]);
+    }
+    if (total > 0) {
+      Moteur.generer(base, op, 'sortie_stock',
+          total: total, variables: Stocks._variables(op.d('stock')), activite: 'DESINTOX', libelle: '${op.d('designation')} servi ${op.piece}');
+    }
+  }
+
+  @override
+  void annuler(Base base, Operation cible, Operation annulation) {
+    base.exec('UPDATE mouvements_stock SET annule=1 WHERE uuid_op=?', [cible.uuid]);
+    base.exec('UPDATE consommations SET annule=1 WHERE uuid_op=?', [cible.uuid]);
+    for (final p in cible.d<List>('patients').cast<Map>()) {
+      base.exec('UPDATE desintox_dossiers SET medicaments_compris = medicaments_compris - ? WHERE id=?',
+          [(p['quantite'] as int) * cible.d<int>('cout'), p['dossier']]);
+    }
   }
 }

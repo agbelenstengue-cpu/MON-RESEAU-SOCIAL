@@ -22,6 +22,7 @@ class Parametrage {
     'tresoreries', 'actes_catalogue', 'tarifs', 'programmes_desintox',
     'schemas_ecritures', 'utilisateurs', 'appareils',
     'produits', 'lits', 'rubriques_paie', 'categories_immobilisations',
+    'natures_depenses', 'depenses_modeles',
   ];
 
   static String _cleAleatoire() {
@@ -36,6 +37,7 @@ class Parametrage {
     String identifiantAdmin = 'admin',
     String nomAdmin = 'Administrateur',
     String nomAppareil = 'PC central',
+    String nomComptable = 'Comptable',
     Uint8List? logo,
   }) {
     if (base.entier('SELECT COUNT(*) FROM entites') > 0) {
@@ -110,6 +112,9 @@ class Parametrage {
       base.exec("INSERT INTO appareils(code, nom, type, central, cle_sync) VALUES (?,?,'pc',1,?)",
           [base.appareil, nomAppareil, _cleAleatoire()]);
       _insererUtilisateur(base, identifiantAdmin, nomAdmin, 'admin', motDePasseAdmin, null, null);
+      // Compte du comptable et gestionnaire : le logiciel s'ouvre directement dessus.
+      final comptable = _insererUtilisateur(base, 'comptable', nomComptable, 'comptable', motDePasseAdmin, null, null);
+      base.definirParam('utilisateur_par_defaut', comptable);
       base.exec("INSERT INTO etat_sync(cle, valeur) VALUES ('installe_le', ?)", [base.maintenant.toIso8601String()]);
       completerReferentiels(base);
       Audit.tracer(base, utilisateur: 'installation', action: 'installation', objet: 'PC central ${base.appareil}');
@@ -155,6 +160,18 @@ class Parametrage {
       for (final r in rubriquesPaieDefaut) {
         base.exec(
             "INSERT OR IGNORE INTO rubriques_paie(code, depuis, libelle, nature, organisme, taux, plafond) VALUES (?,'2000-01-01',?,?,?,?,?)", r);
+      }
+      for (final n in naturesDepensesDefaut) {
+        for (final (ent, act) in [('CS', n[3]), ('ONG', n[4])]) {
+          if (act == null && (n[0] == 'MEDIC' || n[0] == 'REACTIF' || n[0] == 'AIDE')) continue;
+          base.exec('INSERT OR IGNORE INTO natures_depenses(code, entite, libelle, compte, activite) VALUES (?,?,?,?,?)',
+              [n[0], ent, n[1], n[2], act]);
+        }
+      }
+      for (final r in remedesDefaut) {
+        base.exec(
+            "INSERT OR IGNORE INTO produits(code, designation, stock, forme, unite, prix_vente, stock_minimum, remede) VALUES (?,?,'PHT','liquide','litre',?,10,1)",
+            r);
       }
       for (final c in categoriesImmobilisationsDefaut) {
         base.exec(

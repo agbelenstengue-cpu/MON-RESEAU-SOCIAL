@@ -39,6 +39,7 @@ class Actes {
     String? prescripteur,
     String statut = 'realise',
     String? sejour,
+    String? client,
   }) {
     final base = s.base;
     return base.transaction(() {
@@ -114,6 +115,8 @@ class Actes {
       return Operations.enregistrer(s, type: 'acte', entite: entite, typePiece: typePiece, donnees: {
         'activite': activite,
         'patient': patient,
+        // Client sans dossier : nom libre, ou « Client divers ».
+        'client': patient == null ? ((client ?? '').trim().isEmpty ? 'Client divers' : client!.trim()) : null,
         'mode': mode,
         'reference': reference,
         'motif_gratuite': mode == Modes.gratuit ? motifGratuite : null,
@@ -130,12 +133,17 @@ class Actes {
     });
   }
 
-  /// Laboratoire : passe un examen de « demandé » à « réalisé ».
-  static Operation marquerRealise(Session s, String uuidActe) {
+  static const statuts = {'demande': 'Demandé', 'realise': 'Réalisé', 'remis': 'Résultat remis'};
+
+  /// Laboratoire : demandé, réalisé, résultat remis.
+  static Operation changerStatut(Session s, String uuidActe, String statut) {
     final base = s.base;
+    if (!statuts.containsKey(statut)) throw const RegleMetier('Statut inconnu.');
     final op = Operations.lire(base, uuidActe) ?? (throw const RegleMetier('Acte introuvable.'));
-    return Operations.enregistrer(s, type: 'acte_statut', entite: op.entite, donnees: {'acte': uuidActe, 'statut': 'realise'});
+    return Operations.enregistrer(s, type: 'acte_statut', entite: op.entite, donnees: {'acte': uuidActe, 'statut': statut});
   }
+
+  static Operation marquerRealise(Session s, String uuidActe) => changerStatut(s, uuidActe, 'realise');
 
   /// Créance d'un patient (ou organisme) : calculée depuis la comptabilité.
   static int creance(Base base, String tiers, {String compte = '4111'}) =>
@@ -186,10 +194,10 @@ class _Acte extends TypeOperation {
     for (final l in lignes) {
       base.exec(
           'INSERT INTO actes(uuid_op, piece, patient, activite, code_acte, libelle, quantite, prix_unitaire, remise, montant, mode, '
-          'motif_gratuite, praticien, date, horodatage, appareil, utilisateur, statut, sejour) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+          'motif_gratuite, praticien, date, horodatage, appareil, utilisateur, statut, sejour, client) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
           [op.uuid, op.piece, patient, activite, l['code'], l['libelle'], l['quantite'], l['prix_unitaire'], l['remise'],
             l['montant'], mode, op.d('motif_gratuite'), op.d('praticien'), op.dateOp, op.horodatage, op.appareil, op.utilisateur,
-            op.d('statut'), op.donnees['sejour']]);
+            op.d('statut'), op.donnees['sejour'], op.donnees['client']]);
     }
     final total = op.d<int>('total');
     if (mode == Modes.gratuit || total == 0) return;

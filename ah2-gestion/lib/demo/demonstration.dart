@@ -28,10 +28,12 @@ class Demo {
   static Map<String, String> installerCentral(Base b, {Uint8List? logo}) {
     initialiserModules();
     Parametrage.installerPcCentral(b, motDePasseAdmin: motDePasse, logo: logo);
-    b.transaction(() => b.definirParam('demonstration', '1'));
+    b.transaction(() {
+      b.definirParam('demonstration', '1');
+      b.exec("UPDATE utilisateurs SET nom='M. Ekotto' WHERE identifiant='comptable'");
+    });
     final admin = Session.pour(b, 'admin');
     for (final u in [
-      ['comptable', 'M. Ekotto', 'comptable', null],
       ['caisse', 'Mme Ngo Bassa', 'caissier', null],
       ['labo', 'M. Fouda (laboratoire)', 'agent', 'LAB'],
       ['consult', 'Dr Abena (consultations)', 'agent', 'CONS'],

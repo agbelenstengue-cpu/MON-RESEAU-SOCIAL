@@ -143,7 +143,33 @@ class Base {
 
   String nouvelUuid() => _uuid.v4();
 
-  DateTime get maintenant => horloge();
+  /// Date de saisie choisie (reprise de l'historique). Quand elle est
+  /// définie, les opérations sont datées de ce jour (à l'heure actuelle),
+  /// tandis que la date et l'heure réelles restent tracées (audit).
+  String? dateSaisie;
+
+  /// Instant « métier » : la date de saisie choisie, sinon maintenant.
+  DateTime get maintenant {
+    final r = horloge();
+    final d = dateSaisie;
+    if (d == null) return r;
+    final p = d.split('-').map(int.parse).toList();
+    return DateTime(p[0], p[1], p[2], r.hour, r.minute, r.second);
+  }
+
+  /// Exécute [action] à la date réelle (clôtures, relevés, synchronisation).
+  T aDateReelle<T>(T Function() action) {
+    final d = dateSaisie;
+    dateSaisie = null;
+    try {
+      return action();
+    } finally {
+      dateSaisie = d;
+    }
+  }
+
+  /// Instant réel (horloge de l'appareil), pour la traçabilité.
+  DateTime get maintenantReel => horloge();
 
   /// Copie cohérente de la base dans un fichier (sauvegarde à chaud).
   void copierVers(String cheminCible) {

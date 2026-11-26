@@ -29,15 +29,15 @@ class Cloture {
 
   static Operation cloturer(Session s, {required String entite, required String date}) {
     final base = s.base;
-    return base.transaction(() {
+    return base.aDateReelle(() => base.transaction(() {
       if (!Parametrage.estCentral(base)) throw const RegleMetier('La clôture se fait sur le PC central.');
-      if (date.compareTo(dateIso(base.maintenant)) >= 0) {
+      if (date.compareTo(dateIso(base.maintenantReel)) >= 0) {
         throw const RegleMetier('Seule une journée terminée peut être clôturée.');
       }
       if (Operations.estCloturee(base, entite, date)) throw const RegleMetier('Cette journée est déjà clôturée.');
       exigerTousSynchronises(base, date);
       return Operations.enregistrer(s, type: 'cloture_jour', entite: entite, donnees: {'date': date});
-    });
+    }));
   }
 
   /// Étape 1 : le comptable demande la réouverture, avec motif.
@@ -65,7 +65,7 @@ class Cloture {
   static Operation verrouiller(Session s, {required String entite, required String periode}) {
     final base = s.base;
     if (!RegExp(r'^\d{4}(-\d{2})?$').hasMatch(periode)) throw const RegleMetier('Période : AAAA-MM ou AAAA.');
-    if (periode.compareTo(dateIso(base.maintenant).substring(0, periode.length)) >= 0) {
+    if (periode.compareTo(dateIso(base.maintenantReel).substring(0, periode.length)) >= 0) {
       throw const RegleMetier('Seule une période terminée peut être verrouillée.');
     }
     return Operations.enregistrer(s, type: 'verrouillage_periode', entite: entite, donnees: {'periode': periode});

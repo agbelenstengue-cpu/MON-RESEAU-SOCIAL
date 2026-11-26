@@ -252,7 +252,8 @@ class Documents {
         if (annule) pw.Text('*** ANNULÉ ***', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
         pw.SizedBox(height: 4),
         pw.Text('Le ${dateFr(op.instant)} à ${heureFr(op.instant)}', style: petit),
-        if (patient != null) pw.Text('Patient : ${patient['nom']} ${patient['prenoms']} (${patient['numero_dossier']})', style: petit),
+        if (patient != null) pw.Text('Patient : ${patient['nom']} ${patient['prenoms']} (${patient['numero_dossier']})', style: petit)
+        else if (op.donnees['client'] != null) pw.Text('Client : ${op.donnees['client']}', style: petit),
         if (op.type == 'desintox_versement') pw.Text('Payé par : ${op.d('payeur')}', style: petit),
         pw.Divider(thickness: 0.5),
         for (final l in lignes)

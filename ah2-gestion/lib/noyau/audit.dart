@@ -31,7 +31,7 @@ class Audit {
     final prec = base.valeur('SELECT empreinte FROM audit ORDER BY id DESC LIMIT 1')
             as String? ??
         _origine;
-    final h = base.maintenant.toIso8601String();
+    final h = base.maintenantReel.toIso8601String();
     final app = appareil ?? base.appareil;
     final a = ancien == null ? null : (ancien is String ? ancien : jsonEncode(ancien));
     final n = nouveau == null ? null : (nouveau is String ? nouveau : jsonEncode(nouveau));

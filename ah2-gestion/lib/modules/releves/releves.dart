@@ -119,14 +119,14 @@ class Releves {
 
   static Operation generer(Session s, {required String activite, required String date}) {
     final base = s.base;
-    return base.transaction(() {
+    return base.aDateReelle(() => base.transaction(() {
       if (!Parametrage.estCentral(base)) throw const RegleMetier('Les relevés se génèrent sur le PC central.');
       s.exiger('releves', 'creer');
       final act = base.ligne('SELECT * FROM activites WHERE code=? AND service=1', [activite]) ??
           (throw RegleMetier("$activite n'est pas un service."));
       // Le relevé est figé : il ne peut porter que sur une journée terminée,
       // sinon des actes saisis ensuite manqueraient.
-      if (date.compareTo(dateIso(base.maintenant)) >= 0) {
+      if (date.compareTo(dateIso(base.maintenantReel)) >= 0) {
         throw const RegleMetier('Le relevé porte sur une journée terminée (par exemple, la veille).');
       }
       Cloture.exigerTousSynchronises(base, date);
@@ -146,7 +146,7 @@ class Releves {
         'genere_par': s.nom,
         'contenu': calculer(base, activite, date),
       });
-    });
+    }));
   }
 
   /// Génère d'un coup les relevés de tous les services pour une date.

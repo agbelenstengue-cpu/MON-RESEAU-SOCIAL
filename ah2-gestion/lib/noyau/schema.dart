@@ -11,7 +11,7 @@ library;
 
 /// Version du schéma. Une mise à jour du logiciel n'efface jamais rien :
 /// chaque nouvelle version ajoute des tables ou des colonnes (voir [migrations]).
-const int versionSchema = 2;
+const int versionSchema = 3;
 
 const String schemaSql = r'''
 -- ============================== PARAMÉTRAGE ==============================
@@ -676,5 +676,62 @@ ALTER TABLE desintox_dossiers ADD COLUMN medicaments_factures INTEGER NOT NULL D
 ALTER TABLE desintox_dossiers ADD COLUMN medicaments_compris INTEGER NOT NULL DEFAULT 0;
 -- ---------- Actes rattachés à un séjour d'hospitalisation
 ALTER TABLE actes ADD COLUMN sejour TEXT;
+""",
+  3: r"""
+-- ---------- Client divers (sans dossier patient)
+ALTER TABLE actes ADD COLUMN client TEXT;
+
+-- ---------- Natures de dépenses (électricité, eau…) reliées à leur compte
+CREATE TABLE natures_depenses (
+  code TEXT NOT NULL,
+  entite TEXT NOT NULL,
+  libelle TEXT NOT NULL,
+  compte TEXT NOT NULL,
+  activite TEXT,
+  actif INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (code, entite)
+) STRICT;
+ALTER TABLE depenses ADD COLUMN nature TEXT;
+
+-- ---------- Dépenses répétitives (loyer, abonnements…)
+CREATE TABLE depenses_modeles (
+  id TEXT PRIMARY KEY,
+  entite TEXT NOT NULL,
+  nature TEXT NOT NULL,
+  beneficiaire TEXT NOT NULL,
+  montant INTEGER NOT NULL,
+  jour INTEGER NOT NULL,
+  actif INTEGER NOT NULL DEFAULT 1
+) STRICT;
+
+-- ---------- Remèdes traditionnels (AE, SE…) servis au litre
+ALTER TABLE produits ADD COLUMN remede INTEGER NOT NULL DEFAULT 0;
+
+-- ---------- Tout ce qui est donné à un patient interné (fiche de suivi)
+CREATE TABLE consommations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uuid_op TEXT NOT NULL,
+  dossier TEXT,
+  sejour TEXT,
+  patient TEXT,
+  produit TEXT NOT NULL,
+  designation TEXT NOT NULL,
+  quantite INTEGER NOT NULL,
+  unite TEXT NOT NULL,
+  cout INTEGER NOT NULL,
+  montant INTEGER NOT NULL DEFAULT 0,
+  facture INTEGER NOT NULL DEFAULT 0,
+  date TEXT NOT NULL,
+  annule INTEGER NOT NULL DEFAULT 0
+) STRICT;
+CREATE INDEX consommations_dossier ON consommations(dossier);
+CREATE INDEX consommations_sejour ON consommations(sejour);
+
+-- ---------- Comptes rendus du soir (observations du comptable)
+CREATE TABLE comptes_rendus (
+  date TEXT PRIMARY KEY,
+  observations TEXT NOT NULL,
+  uuid_op TEXT NOT NULL
+) STRICT;
 """,
 };

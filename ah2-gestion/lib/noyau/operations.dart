@@ -142,7 +142,7 @@ class Operations {
       final derniere = base.valeur("SELECT valeur FROM etat_sync WHERE cle='derniere_sync'") as String?;
       final reference = derniere ?? base.valeur("SELECT valeur FROM etat_sync WHERE cle='installe_le'") as String?;
       if (reference != null) {
-        final jours = base.maintenant.difference(DateTime.parse(reference)).inHours / 24;
+        final jours = base.maintenantReel.difference(DateTime.parse(reference)).inHours / 24;
         if (jours > base.paramInt('sync_jours_max')) {
           throw RegleMetier(
               "Lecture seule : aucune synchronisation depuis plus de ${base.paramInt('sync_jours_max')} jours. "
@@ -174,6 +174,7 @@ class Operations {
     String? typePiece,
   }) {
     initialiser();
+    // (les données peuvent être complétées : saisie rétroactive)
     final t = typeDe(type);
     final base = s.base;
     return base.transaction(() {
@@ -186,6 +187,17 @@ class Operations {
       }
       final maintenant = base.maintenant;
       final dateOp = dateIso(maintenant);
+      final retroactif = base.dateSaisie != null && base.dateSaisie != dateIso(base.maintenantReel);
+      if (retroactif) {
+        // Saisie à une date passée : droit dédié, jamais dans le futur.
+        if (!s.peut('retroactif', 'creer')) {
+          throw const DroitRefuse("Vous n'avez pas le droit de saisir à une date passée.");
+        }
+        if (dateOp.compareTo(dateIso(base.maintenantReel)) > 0) {
+          throw const RegleMetier('On ne peut pas saisir une opération à une date future.');
+        }
+        donnees = {...donnees, '_saisi_le': base.maintenantReel.toIso8601String()};
+      }
       if (!t.horsJournee) {
         verifierSaisie(base, entite, dateOp);
       } else {
@@ -233,7 +245,7 @@ class Operations {
         op.piece,
         jsonEncode(op.donnees),
         op.origine,
-        base.maintenant.toIso8601String(),
+        base.maintenantReel.toIso8601String(),
       ]);
 
   /// Intègre une opération reçue par synchronisation. Idempotent : une
@@ -269,7 +281,7 @@ class Operations {
 
   static void signalerAnomalie(Base base, String type, String? uuidOp, String detail) => base.exec(
       'INSERT INTO anomalies_sync(horodatage, type, uuid_op, detail) VALUES (?,?,?,?)',
-      [base.maintenant.toIso8601String(), type, uuidOp, detail]);
+      [base.maintenantReel.toIso8601String(), type, uuidOp, detail]);
 
   static Operation? lire(Base base, String uuid) {
     final l = base.ligne('SELECT * FROM operations WHERE uuid=?', [uuid]);

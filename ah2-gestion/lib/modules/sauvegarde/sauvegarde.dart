@@ -29,7 +29,7 @@ class Sauvegarde {
     if (motDePasse.length < 8) throw const RegleMetier('Mot de passe de sauvegarde : 8 caractères minimum.');
     final d = Directory(dossier);
     if (!d.existsSync()) throw RegleMetier('Dossier de sauvegarde introuvable : $dossier');
-    final h = base.maintenant;
+    final h = base.maintenantReel;
     final nom = 'AH2-${base.appareil}-${dateIso(h)}-${h.hour.toString().padLeft(2, '0')}${h.minute.toString().padLeft(2, '0')}${h.second.toString().padLeft(2, '0')}.ah2s';
     final temp = p.join(Directory.systemTemp.path, 'ah2-${base.nouvelUuid()}.db');
     final precedente = base.valeur("SELECT valeur FROM etat_sync WHERE cle='derniere_sauvegarde'") as String?;
@@ -66,7 +66,7 @@ class Sauvegarde {
 
   static void _purger(Base base, String dossier) {
     final jours = base.paramInt('sauvegarde_conservation_jours');
-    final limite = base.maintenant.subtract(Duration(days: jours));
+    final limite = base.maintenantReel.subtract(Duration(days: jours));
     for (final f in Directory(dossier).listSync().whereType<File>()) {
       if (f.path.endsWith('.ah2s') && f.lastModifiedSync().isBefore(limite)) f.deleteSync();
     }

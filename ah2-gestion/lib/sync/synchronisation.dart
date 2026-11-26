@@ -100,7 +100,7 @@ class ServeurSync {
       final versionCentrale = base.paramInt('version_parametrage');
       final complet = req['complet'] == true && !reste;
       if (complet) {
-        base.exec('UPDATE appareils SET derniere_sync=? WHERE code=?', [base.maintenant.toIso8601String(), code]);
+        base.exec('UPDATE appareils SET derniere_sync=? WHERE code=?', [base.maintenantReel.toIso8601String(), code]);
       }
       Audit.tracer(base,
           utilisateur: 'synchronisation',
@@ -113,7 +113,7 @@ class ServeurSync {
         'curseur': curseur,
         'reste': reste,
         'parametrage': req['version_parametrage'] == versionCentrale ? null : Parametrage.exporter(base, pourAppareil: code),
-        'heure_centrale': base.maintenant.toIso8601String(),
+        'heure_centrale': base.maintenantReel.toIso8601String(),
       };
     });
     return Enveloppe.fermer(code, cle, reponse);
@@ -159,7 +159,7 @@ class ClientSync {
   static void enroler(Base base, {required String cleSync}) => base.transaction(() {
         for (final e in {
           'cle_sync': cleSync,
-          'installe_le': base.maintenant.toIso8601String(),
+          'installe_le': base.maintenantReel.toIso8601String(),
         }.entries) {
           base.exec('INSERT INTO etat_sync(cle, valeur) VALUES (?,?) ON CONFLICT(cle) DO UPDATE SET valeur=excluded.valeur',
               [e.key, e.value]);
@@ -192,7 +192,7 @@ class ClientSync {
       base.transaction(() => _definir('compteur', '$compteur'));
       final requete = {
         'compteur': compteur,
-        'horodatage': base.maintenant.toIso8601String(),
+        'horodatage': base.maintenantReel.toIso8601String(),
         'operations': [for (final l in lot) Operation.depuisLigne(l).versJson()],
         'recu_jusqua': int.parse(_etat('recu_jusqua') ?? '0'),
         'version_parametrage': initial ? -1 : base.paramInt('version_parametrage', 0),
@@ -226,7 +226,7 @@ class ClientSync {
       if (enAttente.length <= tailleLot && rep['reste'] != true) break;
     }
     base.transaction(() {
-      _definir('derniere_sync', base.maintenant.toIso8601String());
+      _definir('derniere_sync', base.maintenantReel.toIso8601String());
       Audit.tracer(base,
           utilisateur: 'synchronisation', action: 'synchronisation', objet: 'PC central', nouveau: {'envoyees': envoyees, 'recues': recues});
     });

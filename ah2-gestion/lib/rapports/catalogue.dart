@@ -8,6 +8,8 @@ import 'etats_comptables.dart';
 import 'etats_gestion.dart';
 import 'etats_phase3.dart';
 import 'etats_stocks_hospitalisation.dart';
+import 'etats_suivi_audit.dart';
+import 'statistiques.dart';
 import 'modele.dart';
 
 enum Filtre { periode, date, entite, activite, utilisateur, appareil, subvention, tresorerie, racine, stock, patient, employe }
@@ -114,6 +116,21 @@ class Catalogue {
         (b, p) => EtatsImmobilisations.tableauAmortissements(b, p.entite, int.parse(p.date.substring(0, 4)))),
     DefRapport('inventaire_immo', 'Immobilisations', "Fiche d'inventaire physique des biens", '', {Filtre.entite},
         (b, p) => EtatsImmobilisations.ficheInventaire(b, p.entite)),
+    DefRapport('compte_rendu', 'Gestion', 'Compte rendu de la journée aux dirigeants',
+        'Activité par service, dépenses, caisses, désintoxication, alertes et observations du comptable.', {Filtre.date},
+        (b, p) => EtatsSuivi.compteRendu(b, p.date)),
+    DefRapport('statistiques', 'Gestion', 'Statistiques', 'Évolution des recettes et des charges, répartitions par service et par nature.',
+        {Filtre.periode}, (b, p) => Statistiques.calculer(b, p.periode, entite: p.filtres.entite).rapport()),
+    DefRapport('audit_annulations', 'Contrôle', 'Annulations et motifs', '', {Filtre.periode}, (b, p) => EtatsAudit.annulations(b, p.periode)),
+    DefRapport('audit_gratuites', 'Contrôle', 'Gratuités et remises', '', {Filtre.periode}, (b, p) => EtatsAudit.gratuitesRemises(b, p.periode)),
+    DefRapport('audit_ecarts', 'Contrôle', 'Écarts de caisse', '', {Filtre.periode}, (b, p) => EtatsAudit.ecartsCaisse(b, p.periode)),
+    DefRapport('audit_modifications', 'Contrôle', 'Changements de prix, de montants et de paramètres', '', {Filtre.periode},
+        (b, p) => EtatsAudit.modifications(b, p.periode)),
+    DefRapport('audit_retroactif', 'Contrôle', 'Saisies à une date passée', 'Date de l’opération et date réelle de saisie.', {Filtre.periode},
+        (b, p) => EtatsAudit.saisiesRetroactives(b, p.periode)),
+    DefRapport('audit_journal', 'Contrôle', "Journal d'audit (historique complet)", 'Toutes les actions, filtrables par appareil et utilisateur.',
+        {Filtre.periode, Filtre.appareil, Filtre.utilisateur},
+        (b, p) => EtatsAudit.journal(b, p.periode, appareil: p.filtres.appareil, utilisateur: p.filtres.utilisateur)),
     DefRapport('releves_suivi', 'Contrôle', 'Suivi des relevés et des écarts', '', {Filtre.periode}, (b, p) => EtatsGestion.suiviReleves(b, p.periode)),
     DefRapport('anomalies', 'Contrôle', 'Anomalies de synchronisation', '', {Filtre.periode}, (b, p) => EtatsGestion.anomalies(b, p.periode)),
   ];

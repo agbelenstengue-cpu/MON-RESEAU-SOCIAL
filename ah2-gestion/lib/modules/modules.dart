@@ -5,6 +5,7 @@ import '../noyau/operations.dart';
 import 'actes/actes.dart';
 import 'cloture/cloture.dart';
 import 'comptabilite/comptabilite.dart';
+import 'depenses/depenses.dart';
 import 'desintox/desintox.dart';
 import 'dons/dons.dart';
 import 'facturation/facturation.dart';
@@ -36,4 +37,5 @@ void initialiserModules() {
   Facturation.declarer();
   Paie.declarer();
   Immobilisations.declarer();
+  Depenses.declarer();
 }

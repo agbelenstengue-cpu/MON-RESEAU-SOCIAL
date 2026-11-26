@@ -55,7 +55,7 @@ class Securite {
     final cleEchecs = 'echecs:$identifiant';
     final cleVerrou = 'verrou:$identifiant';
     final verrou = base.valeur('SELECT valeur FROM etat_sync WHERE cle=?', [cleVerrou]) as String?;
-    if (verrou != null && DateTime.parse(verrou).isAfter(base.maintenant)) {
+    if (verrou != null && DateTime.parse(verrou).isAfter(base.maintenantReel)) {
       throw RegleMetier('Compte verrouillé après plusieurs échecs. Réessayez après ${heureFr(DateTime.parse(verrou))}.');
     }
     final u = base.ligne('SELECT * FROM utilisateurs WHERE LOWER(TRIM(identifiant))=? AND actif=1', [identifiant]);
@@ -72,7 +72,7 @@ class Securite {
         final n = int.parse((base.valeur('SELECT valeur FROM etat_sync WHERE cle=?', [cleEchecs]) as String?) ?? '0') + 1;
         _etat(base, cleEchecs, '$n');
         if (n >= base.paramInt('connexion_echecs_max', 5)) {
-          final fin = base.maintenant.add(Duration(minutes: base.paramInt('connexion_verrou_minutes', 15)));
+          final fin = base.maintenantReel.add(Duration(minutes: base.paramInt('connexion_verrou_minutes', 15)));
           _etat(base, cleVerrou, fin.toIso8601String());
           _etat(base, cleEchecs, '0');
         }

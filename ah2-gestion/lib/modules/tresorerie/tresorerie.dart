@@ -123,9 +123,10 @@ class Tresorerie {
     Session s, {
     required String entite,
     required String beneficiaire,
-    required String motif,
-    required String compteCharge,
-    required String activite,
+    String motif = '',
+    String? compteCharge,
+    String? activite,
+    String? nature,
     required int montant,
     String? tresorerie,
     String? pieceJointe,
@@ -136,10 +137,20 @@ class Tresorerie {
     final base = s.base;
     return base.transaction(() {
       if (montant <= 0) throw const RegleMetier('Le montant doit être positif.');
+      // Nature de dépense : le compte et le service sont déduits (aucun numéro à choisir).
+      if (nature != null) {
+        final n = base.ligne('SELECT * FROM natures_depenses WHERE code=? AND entite=? AND actif=1', [nature, entite]) ??
+            (throw const RegleMetier('Nature de dépense inconnue.'));
+        compteCharge ??= n['compte'] as String;
+        activite ??= (n['activite'] as String?) ?? (entite == 'CS' ? 'ADM_CS' : 'ADM_ONG');
+        if (motif.trim().isEmpty) motif = n['libelle'] as String;
+      }
+      if (compteCharge == null || activite == null) throw const RegleMetier('Choisissez la nature de la dépense.');
+      final compteCharge0 = compteCharge!;
       if (beneficiaire.trim().isEmpty || motif.trim().isEmpty) {
         throw const RegleMetier('Le bénéficiaire et le motif sont obligatoires.');
       }
-      if (!compteCharge.startsWith('6') && !compteCharge.startsWith('2') && !compteCharge.startsWith('4')) {
+      if (!compteCharge0.startsWith('6') && !compteCharge0.startsWith('2') && !compteCharge0.startsWith('4')) {
         throw const RegleMetier('Imputation invalide : choisissez un compte de charge (classe 6).');
       }
       if (montant > base.paramInt('seuil_piece_jointe') && fichier == null && (pieceJointe == null || pieceJointe.isEmpty)) {
@@ -154,8 +165,9 @@ class Tresorerie {
       return Operations.enregistrer(s, type: 'depense', entite: entite, typePiece: 'DEC', donnees: {
         'beneficiaire': beneficiaire.trim(),
         'motif': motif.trim(),
-        'compte': compteCharge,
+        'compte': compteCharge0,
         'activite': activite,
+        'nature': nature,
         'montant': montant,
         'tresorerie': treso,
         'piece_jointe': fichier?['sha256'] ?? pieceJointe,
@@ -295,10 +307,10 @@ class _Depense extends TypeOperation {
     PiecesJointes.enregistrer(base, op, op.donnees['fichier']);
     final aValider = op.d<bool>('a_valider');
     base.exec(
-        'INSERT INTO depenses(uuid_op, entite, piece, date, beneficiaire, motif, compte, activite, subvention, tresorerie, montant, piece_jointe, statut) '
-        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        'INSERT INTO depenses(uuid_op, entite, piece, date, beneficiaire, motif, compte, activite, subvention, tresorerie, montant, piece_jointe, statut, nature) '
+        'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
         [op.uuid, op.entite, op.piece, op.dateOp, op.d('beneficiaire'), op.d('motif'), op.d('compte'), op.d('activite'),
-          op.d('subvention'), op.d('tresorerie'), op.d('montant'), op.d('piece_jointe'), aValider ? 'en_attente' : 'payee']);
+          op.d('subvention'), op.d('tresorerie'), op.d('montant'), op.d('piece_jointe'), aValider ? 'en_attente' : 'payee', op.donnees['nature']]);
     if (!aValider) {
       payer(base, op, base.ligne('SELECT * FROM depenses WHERE uuid_op=?', [op.uuid])!, paiement: op);
     }

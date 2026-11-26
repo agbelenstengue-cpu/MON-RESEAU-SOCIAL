@@ -139,6 +139,19 @@ const actesDefaut = [
   ['LAB-GE', 'Goutte épaisse (paludisme)', 'LAB', '7062', 1000],
   ['LAB-WID', 'Sérodiagnostic de Widal', 'LAB', '7062', 3000],
   ['LAB-ECBU', 'ECBU', 'LAB', '7062', 4000],
+  ['LAB-GS', 'Groupe sanguin et rhésus', 'LAB', '7062', 2000],
+  ['LAB-VIH', 'Test VIH', 'LAB', '7062', 2000],
+  ['LAB-AGHBS', 'Antigène HBs (hépatite B)', 'LAB', '7062', 3000],
+  ['LAB-HCV', 'Hépatite C', 'LAB', '7062', 3500],
+  ['LAB-TDR', 'TDR paludisme', 'LAB', '7062', 1000],
+  ['LAB-TG', 'Test de grossesse', 'LAB', '7062', 1500],
+  ['LAB-SELLES', 'Examen des selles (KAOP)', 'LAB', '7062', 1500],
+  ['LAB-UREE', 'Urée', 'LAB', '7062', 2500],
+  ['LAB-CREA', 'Créatinine', 'LAB', '7062', 2500],
+  ['LAB-TRANS', 'Transaminases (ASAT, ALAT)', 'LAB', '7062', 5000],
+  ['LAB-CHOL', 'Cholestérol total', 'LAB', '7062', 3000],
+  ['LAB-VS', 'Vitesse de sédimentation', 'LAB', '7062', 1500],
+  ['LAB-CRP', 'CRP', 'LAB', '7062', 4000],
   ['MASS-30', 'Massage 30 minutes', 'MASS', '7065', 5000],
   ['MASS-60', 'Massage 60 minutes', 'MASS', '7065', 9000],
 ];
@@ -270,6 +283,7 @@ const tousModules = [
   ...modulesSaisie,
   'parametrage', 'utilisateurs', 'appareils', 'sauvegardes', 'comptabilite',
   'rapports', 'cloture', 'audit', 'anomalies', 'patients_noms', 'remises', 'tresorerie',
+  'retroactif', 'statistiques',
 ];
 
 /// Droits par défaut : rôle -> module -> actions.
@@ -284,14 +298,8 @@ Map<String, Map<String, List<String>>> droitsDefaut() {
       'sauvegardes': ['voir', 'creer', 'valider'],
       'audit': ['voir'],
     },
-    'comptable': {
-      for (final m in tousModules) m: tout,
-      // Le comptable gère aussi le personnel qui utilise le logiciel.
-      'utilisateurs': ['voir', 'creer'],
-      'appareils': ['voir'],
-      'sauvegardes': ['voir', 'creer'],
-      'audit': ['voir'],
-    },
+    // Le comptable et gestionnaire a tous les droits (ouverture directe).
+    'comptable': {for (final m in tousModules) m: tout},
     'caissier': {
       'hospitalisation': ['voir', 'creer'],
       'facturation': ['voir'],
@@ -364,6 +372,9 @@ const parametresDefaut = {
   'tresorerie_minimum': '0',
   'alerte_deficit': '1',
   'cle_repartition': 'chiffre_affaires',
+  // Ouverture directe sans identifiant (1 = demander la connexion).
+  'connexion_requise': '0',
+  'remede_litres_par_patient': '1',
   'sortie_stock_minimum_jours': '0',
   // Billets et pièces FCFA (billetage).
   'coupures': '10000,5000,2000,1000,500,100,50,25,10,5,1',
@@ -398,3 +409,30 @@ const magasinsDefaut = {
   'PHT': ['Pharmacie traditionnelle', '3112', '6031', '6012', '7012', 'PHT'],
   'LAB': ['Réactifs du laboratoire', '3311', '6033', '6041', '', 'LAB'],
 };
+
+/// Natures de dépenses courantes, reliées à leur compte : le comptable
+/// choisit « Électricité », jamais un numéro de compte.
+/// [code, libellé, compte, activité par défaut (CS), activité par défaut (ONG)]
+const naturesDepensesDefaut = [
+  ['ELEC', 'Électricité', '6052', 'ADM_CS', 'ADM_ONG'],
+  ['EAU', 'Eau', '6051', 'ADM_CS', 'ADM_ONG'],
+  ['CARB', 'Carburant et énergie', '6053', 'ADM_CS', 'ADM_ONG'],
+  ['LOYER', 'Loyer', '6221', 'ADM_CS', 'ADM_ONG'],
+  ['BUREAU', 'Fournitures de bureau', '6055', 'ADM_CS', 'ADM_ONG'],
+  ['ENTRET', "Produits d'entretien", '6054', 'ADM_CS', 'ADM_ONG'],
+  ['REPAR', 'Entretien et réparations', '6241', 'ADM_CS', 'ADM_ONG'],
+  ['TRANSP', 'Transport et déplacements', '6181', 'ADM_CS', 'ADM_ONG'],
+  ['COMM', 'Téléphone, internet, crédit', '6281', 'ADM_CS', 'ADM_ONG'],
+  ['BANQUE', 'Frais bancaires et mobile money', '6311', 'ADM_CS', 'ADM_ONG'],
+  ['MEDIC', 'Achat de médicaments (sans mise en stock)', '6011', 'PHM', null],
+  ['REACTIF', 'Achat de réactifs (sans mise en stock)', '6041', 'LAB', null],
+  ['AIDE', 'Aides et secours aux bénéficiaires', '6581', null, 'PROG'],
+  ['DIVERS', 'Dépenses diverses', '6588', 'ADM_CS', 'ADM_ONG'],
+];
+
+/// Remèdes traditionnels servis en désintoxication, au litre (prix du litre
+/// à fixer par le comptable). [code, désignation, prix du litre]
+const remedesDefaut = [
+  ['AE', 'Remède traditionnel AE', 0],
+  ['SE', 'Remède traditionnel SE', 0],
+];
