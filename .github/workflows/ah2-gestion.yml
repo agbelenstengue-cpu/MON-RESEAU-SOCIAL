@@ -51,7 +51,8 @@ jobs:
       - name: Lire la version
         id: version
         shell: bash
-        run: echo "version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//').${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//').${{ github.run_number }}" >> "$GITHUB_OUTPUT"
       - name: Fabriquer l'installateur (Inno Setup)
         shell: pwsh
         run: |
@@ -99,7 +100,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Lire la version
         id: version
-        run: echo "version=$(grep '^version:' ah2-gestion/pubspec.yaml | sed 's/version: *//; s/+.*//').${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=$(grep '^version:' ah2-gestion/pubspec.yaml | sed 's/version: *//; s/+.*//').${{ github.run_number }}" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
           pattern: AH2-Gestion-*
