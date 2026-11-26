@@ -1,0 +1,29 @@
+name: ah2_gestion
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.14.0
+
+dependencies:
+  crypto: ^3.0.8
+  flutter:
+    sdk: flutter
+  material_ui: ^1.1.0
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  pdf: ^3.13.1
+  pointycastle: ^4.0.0
+  printing: ^5.15.1
+  sqlite3: ^3.9.2
+  uuid: ^4.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  test: ^1.32.0
+
+flutter:
+  uses-material-design: true
