@@ -4,11 +4,16 @@ library;
 import 'package:material_ui/material_ui.dart';
 
 import '../../modules/actes/actes.dart';
+import '../../modules/facturation/facturation.dart';
+import '../../pdf/documents.dart';
+import '../../rapports/etats_stocks_hospitalisation.dart';
+import '../../rapports/modele.dart';
 import '../../modules/patients/patients.dart';
 import '../../modules/tresorerie/tresorerie.dart';
 import '../../noyau/outils.dart';
 import '../etat_app.dart';
 import '../widgets/commun.dart';
+import '../widgets/formulaire.dart';
 import '../widgets/pdf_ui.dart';
 import 'desintox.dart';
 
@@ -183,15 +188,34 @@ class FichePatient extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 12),
-        if (creance > 0 && s.peut('caisse', 'creer'))
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.icon(
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          if (creance > 0 && s.peut('caisse', 'creer'))
+            FilledButton.icon(
               onPressed: () => _regler(context, creance),
               icon: const Icon(Icons.payments_outlined),
               label: const Text('Régler la créance'),
             ),
+          if (creance > 0 && s.peut('facturation', 'valider'))
+            OutlinedButton.icon(
+              onPressed: () => formulaire(context, 'Avoir (réduction de la créance)', [
+                Champ('montant', 'Montant (FCFA)', nombre: true, aide: 'Créance : ${fcfa(creance)}'),
+                Champ('compte', 'Prestation concernée', choix: [
+                  for (final c in b.lignes("SELECT numero, libelle FROM comptes WHERE entite='CS' AND actif=1 AND numero LIKE '70%' ORDER BY numero"))
+                    (c['numero'] as String, '${c['numero']} ${c['libelle']}')
+                ]),
+                const Champ('motif', 'Motif (obligatoire)'),
+              ], (c, v) => reussir(c, () => Facturation.avoir(s, tiers: id, montant: int.tryParse(v['montant']!) ?? 0, motif: v['motif']!, compteProduit: v['compte']!),
+                  succes: 'Avoir enregistré.')),
+              icon: const Icon(Icons.remove_circle_outline),
+              label: const Text('Établir un avoir'),
+            ),
+          OutlinedButton.icon(
+            onPressed: () => afficherPdf(context, () => Documents.rapport(b, EtatsTiers.releveCompte(b, id, Periode('2000-01-01', dateIso(b.maintenant)))),
+                'Relevé de compte'),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            label: const Text('Relevé de compte'),
           ),
+        ]),
         if (dossiers.isNotEmpty) ...[
           const SizedBox(height: 16),
           const TitreSection('Programmes de désintoxication'),

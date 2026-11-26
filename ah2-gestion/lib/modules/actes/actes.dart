@@ -38,9 +38,16 @@ class Actes {
     String? organismePec,
     String? prescripteur,
     String statut = 'realise',
+    String? sejour,
   }) {
     final base = s.base;
     return base.transaction(() {
+      if (sejour != null) {
+        // Acte pendant une hospitalisation : facturé au séjour (créance du patient).
+        patient = base.valeur('SELECT patient FROM sejours WHERE id=? AND date_sortie IS NULL', [sejour]) as String? ??
+            (throw const RegleMetier('Séjour introuvable ou terminé.'));
+        mode = Modes.credit;
+      }
       if (actes.isEmpty) throw const RegleMetier('Sélectionnez au moins un acte.');
       if (!Modes.tous.contains(mode)) throw RegleMetier('Mode de paiement inconnu : $mode');
       final act = base.ligne('SELECT * FROM activites WHERE code=? AND actif=1', [activite]) ??
@@ -116,6 +123,7 @@ class Actes {
         'organisme_pec': organismePec,
         'tresorerie': treso,
         'statut': statut,
+        'sejour': sejour,
         'lignes': lignes,
         'total': total,
       });
@@ -178,10 +186,10 @@ class _Acte extends TypeOperation {
     for (final l in lignes) {
       base.exec(
           'INSERT INTO actes(uuid_op, piece, patient, activite, code_acte, libelle, quantite, prix_unitaire, remise, montant, mode, '
-          'motif_gratuite, praticien, date, horodatage, appareil, utilisateur, statut) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+          'motif_gratuite, praticien, date, horodatage, appareil, utilisateur, statut, sejour) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
           [op.uuid, op.piece, patient, activite, l['code'], l['libelle'], l['quantite'], l['prix_unitaire'], l['remise'],
             l['montant'], mode, op.d('motif_gratuite'), op.d('praticien'), op.dateOp, op.horodatage, op.appareil, op.utilisateur,
-            op.d('statut')]);
+            op.d('statut'), op.donnees['sejour']]);
     }
     final total = op.d<int>('total');
     if (mode == Modes.gratuit || total == 0) return;

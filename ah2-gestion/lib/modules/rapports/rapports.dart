@@ -8,6 +8,8 @@ library;
 import '../../noyau/base.dart';
 import '../../noyau/outils.dart';
 import '../desintox/desintox.dart';
+import '../hospitalisation/hospitalisation.dart';
+import '../stocks/stocks.dart';
 import '../tresorerie/tresorerie.dart';
 
 class Rapports {
@@ -205,6 +207,7 @@ class Rapports {
         r.add({'niveau': 'orange', 'titre': 'Appareil non synchronisé', 'detail': '${a['code']} · ${d == null ? 'jamais' : 'depuis ${dateFr(DateTime.parse(d))} ${heureFr(DateTime.parse(d))}'}'});
       }
     }
+    r.addAll(Stocks.alertes(base));
     // Déficits : résultat du mois, activités déficitaires, trésorerie sous le minimum.
     if (base.param('alerte_deficit', '1') == '1') {
       final debutMois = '${aujourdhui.substring(0, 7)}-01';
@@ -257,6 +260,8 @@ class Rapports {
         for (final t in base.lignes('SELECT * FROM tresoreries WHERE actif=1 ORDER BY entite, centrale DESC, type, id'))
           {...t, 'solde': Tresorerie.solde(base, t['id'] as String)}
       ],
+      'occupation_lits': Hospitalisation.tauxOccupation(base),
+      'valeur_stock': base.lignes('SELECT code FROM produits').fold<int>(0, (t, p) => t + Stocks.valeur(base, p['code'] as String)),
       'desintox_en_cours': Desintox.listeTravail(base).where((s) => s.statut == 'en_cours').length,
       'desintox_reste': Desintox.resteTotal(base),
       'creances': base.entier(

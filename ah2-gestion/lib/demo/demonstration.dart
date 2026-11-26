@@ -8,6 +8,8 @@ import 'dart:typed_data';
 import '../modules/actes/actes.dart';
 import '../modules/desintox/desintox.dart';
 import '../modules/dons/dons.dart';
+import '../modules/hospitalisation/hospitalisation.dart';
+import '../modules/stocks/stocks.dart';
 import '../modules/modules.dart';
 import '../modules/parametrage/parametrage.dart';
 import '../modules/patients/patients.dart';
@@ -67,6 +69,35 @@ class Demo {
           Patients.creer(caisse, nom: n[0], prenoms: n[1], sexe: n[2], contact: '6 9${r.nextInt(9)} ${r.nextInt(90) + 10} ${r.nextInt(90) + 10} ${r.nextInt(90) + 10}')
               .d<String>('id')
       ];
+      // Stocks, lits et fournisseur de démonstration.
+      for (final pr in [
+        ['AMOX500', 'Amoxicilline 500 mg', 'PHM', 'gélule', 150, 50, 80],
+        ['PARA500', 'Paracétamol 500 mg', 'PHM', 'comprimé', 50, 100, 20],
+        ['ARTE', 'Artéméther-luméfantrine', 'PHM', 'boîte', 2500, 10, 1600],
+        ['DIAZ', 'Diazépam 5 mg', 'PHM', 'comprimé', 100, 30, 45],
+        ['TISANE', 'Tisane digestive', 'PHT', 'sachet', 1000, 10, 400],
+        ['BANDE', 'Bandelettes glycémie', 'LAB', 'boîte', 0, 5, 6000],
+      ]) {
+        Stocks.enregistrerProduit(comptable,
+            code: pr[0] as String, designation: pr[1] as String, stock: pr[2] as String, forme: pr[3] as String,
+            prixVente: pr[4] as int, stockMinimum: pr[5] as int);
+      }
+      for (final l in ['C1-L1', 'C1-L2', 'C2-L1', 'C2-L2']) {
+        Hospitalisation.enregistrerLit(comptable, code: l, chambre: 'Chambre ${l.substring(1, 2)}', categorie: 'Standard', tarif: 5000);
+      }
+      final fournisseur = Stocks.creerFournisseur(comptable, nom: 'Grossiste pharmaceutique de Yaoundé', contact: '6 90 00 00 00').d<String>('id');
+      Stocks.entrer(comptable, stock: 'PHM', origine: 'achat', fournisseur: fournisseur, facture: 'F-2026-118', lignes: [
+        LigneStock('AMOX500', 300, lot: 'AM-24-11', peremption: _iso(aujourdhui.add(const Duration(days: 300))), coutUnitaire: 80),
+        LigneStock('PARA500', 1000, lot: 'PA-25-02', peremption: _iso(aujourdhui.add(const Duration(days: 500))), coutUnitaire: 20),
+        LigneStock('ARTE', 40, lot: 'AR-25-01', peremption: _iso(aujourdhui.add(const Duration(days: 45))), coutUnitaire: 1600),
+        LigneStock('DIAZ', 200, lot: 'DZ-25-03', peremption: _iso(aujourdhui.add(const Duration(days: 400))), coutUnitaire: 45),
+      ]);
+      Stocks.entrer(comptable, stock: 'PHT', origine: 'achat', fournisseur: fournisseur, lignes: [
+        LigneStock('TISANE', 60, lot: 'TI-01', peremption: _iso(aujourdhui.add(const Duration(days: 200))), coutUnitaire: 400),
+      ]);
+      Stocks.entrer(comptable, stock: 'LAB', origine: 'achat', fournisseur: fournisseur, lignes: const [
+        LigneStock('BANDE', 8, lot: 'BG-7', coutUnitaire: 6000),
+      ]);
       final donateur = Dons.creerDonateur(comptable, nom: 'Fondation Espoir Solidaire', type: 'fondation', pays: 'France').d<String>('id');
       final membre = Dons.creerDonateur(comptable, nom: 'M. Tchoupo (membre)', type: 'membre').d<String>('id');
       // Dossier de désintoxication de la maquette : 450 000 FCFA, 225 000 versés.
@@ -109,6 +140,17 @@ class Demo {
           Desintox.verser(caisse,
               dossierId: dossier, montant: m, payeur: d == jours - 20 ? 'MBARGA Paul' : 'MBARGA Thérèse', mode: d == jours - 20 ? Modes.mtn : Modes.especes,
               reference: d == jours - 20 ? '7654321098' : null);
+        }
+        if (d % 2 == 0) {
+          b.horloge = () => jour(d, 14, 10);
+          Stocks.sortir(comptable, stock: 'PHM', type: 'vente', lignes: [LigneStock(['AMOX500', 'PARA500', 'ARTE'][d % 3], 1 + r.nextInt(6))]);
+        }
+        if (d == 6) {
+          b.horloge = () => jour(d, 10, 0);
+          final sejour = Hospitalisation.admettre(caisse, patient: patients[4], lit: 'C1-L1', caution: 20000).d<String>('id');
+          Actes.enregistrer(caisse, activite: 'LAB', actes: const [DemandeActe('LAB-GE')], mode: Modes.credit, sejour: sejour);
+          Stocks.sortir(comptable, stock: 'PHM', type: 'delivrance_sejour', sejour: sejour, lignes: const [LigneStock('PARA500', 12)]);
+          Stocks.sortir(comptable, stock: 'PHM', type: 'delivrance_desintox', dossierDesintox: dossier, facturer: false, lignes: const [LigneStock('DIAZ', 20)]);
         }
         if (d % 7 == 0 && Tresorerie.solde(b, 'CS-CAISSE') > 18500) {
           b.horloge = () => jour(d, 16, 0);

@@ -15,10 +15,12 @@ import 'comptabilite.dart';
 import 'desintox.dart';
 import 'dons.dart';
 import 'encaissement.dart';
+import 'hospitalisation_ecran.dart';
 import 'parametrage_ecran.dart';
 import 'patients.dart';
 import 'rapports_ecran.dart';
 import 'releves.dart';
+import 'stocks_ecran.dart';
 import 'synchro.dart';
 import 'tableau_bord.dart';
 
@@ -31,6 +33,8 @@ class Destination {
         'patients': 'Patients',
         'desintox': 'Désintox',
         'caisse': 'Trésorerie',
+        'stocks': 'Stocks',
+        'hospitalisation': 'Hospit.',
         'releves': 'Relevés',
         'dons': 'Dons',
         'rapports': 'Rapports',
@@ -49,6 +53,8 @@ final destinations = <Destination>[
   Destination('encaissement', 'Encaissement', Icons.point_of_sale_outlined, (e) => _peut(e, 'actes', 'creer'), () => const EcranEncaissement()),
   Destination('patients', 'Patients', Icons.people_alt_outlined, (e) => _peut(e, 'patients'), () => const EcranPatients()),
   Destination('desintox', 'Désintoxication', Icons.healing_outlined, (e) => _peut(e, 'desintox'), () => const EcranDesintox()),
+  Destination('stocks', 'Pharmacies et stocks', Icons.inventory_2_outlined, (e) => _peut(e, 'stocks'), () => const EcranStocks()),
+  Destination('hospitalisation', 'Hospitalisation', Icons.bed_outlined, (e) => _peut(e, 'hospitalisation'), () => const EcranHospitalisation()),
   Destination('caisse', 'Caisse et trésorerie', Icons.account_balance_wallet_outlined,
       (e) => _peut(e, 'caisse') || _peut(e, 'tresorerie'), () => const EcranCaisse()),
   Destination('releves', 'Relevés journaliers', Icons.fact_check_outlined, (e) => _peut(e, 'releves'), () => const EcranReleves()),
@@ -166,6 +172,7 @@ class _CoquilleState extends State<Coquille> {
   void _plus(BuildContext context, List<Destination> autres) => showModalBottomSheet<void>(
         context: context,
         showDragHandle: true,
+        isScrollControlled: true,
         builder: (c) => SafeArea(
           child: ListView(shrinkWrap: true, children: [
             for (final d in autres)

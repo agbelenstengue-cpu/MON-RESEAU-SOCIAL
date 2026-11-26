@@ -363,7 +363,7 @@ class Parametrage {
   // désactivé (l'historique et la comptabilité restent intacts).
   // ======================================================================
 
-  static T _modifier<T>(Session s, String module, String objet, T Function() action, {Object? ancien, Object? nouveau}) {
+  static T modifier<T>(Session s, String module, String objet, T Function() action, {Object? ancien, Object? nouveau}) {
     final base = s.base;
     return base.transaction(() {
       _exigerCentral(base);
@@ -388,25 +388,25 @@ class Parametrage {
   }
 
   /// Logo de l'entité (null pour le retirer). Utilisé dans l'entête et en filigrane.
-  static void definirLogo(Session s, String entite, Uint8List? image) => _modifier(s, 'parametrage', 'logo:$entite', () {
+  static void definirLogo(Session s, String entite, Uint8List? image) => modifier(s, 'parametrage', 'logo:$entite', () {
         if (image != null) verifierImage(image);
         s.base.exec('UPDATE entites SET logo=? WHERE code=?', [image, entite]);
       }, nouveau: image == null ? 'retiré' : '${image.length} octets');
 
   /// Entête complète importée (image d'un papier à en-tête). Elle remplace
   /// l'entête générée sur tous les documents A4. null pour la retirer.
-  static void definirEntete(Session s, String entite, Uint8List? image) => _modifier(s, 'parametrage', 'entete:$entite', () {
+  static void definirEntete(Session s, String entite, Uint8List? image) => modifier(s, 'parametrage', 'entete:$entite', () {
         if (image != null) verifierImage(image);
         s.base.exec('UPDATE entites SET entete=? WHERE code=?', [image, entite]);
       }, nouveau: image == null ? 'retirée' : '${image.length} octets');
 
-  static void definirFiligrane(Session s, String entite, bool actif) => _modifier(s, 'parametrage', 'filigrane:$entite',
+  static void definirFiligrane(Session s, String entite, bool actif) => modifier(s, 'parametrage', 'filigrane:$entite',
       () => s.base.exec('UPDATE entites SET filigrane=? WHERE code=?', [actif ? 1 : 0, entite]), nouveau: actif);
 
   // ------------------------------------------------------------ services
   static void ajouterActivite(Session s,
           {required String code, required String libelle, required String entite, bool service = true, String typeReleve = 'actes'}) =>
-      _modifier(s, 'parametrage', 'activite:$code', () {
+      modifier(s, 'parametrage', 'activite:$code', () {
         final c = code.trim().toUpperCase();
         if (!RegExp(r'^[A-Z][A-Z0-9_]{1,11}$').hasMatch(c)) throw const RegleMetier('Code de service invalide (ex. ECHO, DENT).');
         _texte(libelle, 'Le libellé');
@@ -415,12 +415,12 @@ class Parametrage {
             [c, libelle.trim(), entite, service ? 1 : 0, typeReleve]);
       }, nouveau: {'libelle': libelle, 'entite': entite});
 
-  static void modifierActivite(Session s, String code, {required String libelle}) => _modifier(s, 'parametrage', 'activite:$code', () {
+  static void modifierActivite(Session s, String code, {required String libelle}) => modifier(s, 'parametrage', 'activite:$code', () {
         _texte(libelle, 'Le libellé');
         s.base.exec('UPDATE activites SET libelle=? WHERE code=?', [libelle.trim(), code]);
       }, nouveau: libelle);
 
-  static String retirerActivite(Session s, String code) => _modifier(s, 'parametrage', 'activite:$code', () {
+  static String retirerActivite(Session s, String code) => modifier(s, 'parametrage', 'activite:$code', () {
         final b = s.base;
         final utilise = b.valeur('SELECT 1 FROM actes WHERE activite=? LIMIT 1', [code]) != null ||
             b.valeur('SELECT 1 FROM lignes_ecriture WHERE activite=? LIMIT 1', [code]) != null ||
@@ -435,12 +435,12 @@ class Parametrage {
       }, nouveau: 'retiré');
 
   static void reactiverActivite(Session s, String code) =>
-      _modifier(s, 'parametrage', 'activite:$code', () => s.base.exec('UPDATE activites SET actif=1 WHERE code=?', [code]), nouveau: 'réactivé');
+      modifier(s, 'parametrage', 'activite:$code', () => s.base.exec('UPDATE activites SET actif=1 WHERE code=?', [code]), nouveau: 'réactivé');
 
   // ------------------------------------------------------------ actes et prix
   static void ajouterActe(Session s,
           {required String code, required String libelle, required String activite, required String compteProduit, required int prix}) =>
-      _modifier(s, 'parametrage', 'acte:$code', () {
+      modifier(s, 'parametrage', 'acte:$code', () {
         final b = s.base;
         final c = code.trim().toUpperCase();
         if (!RegExp(r'^[A-Z0-9][A-Z0-9_-]{1,19}$').hasMatch(c)) throw const RegleMetier("Code d'acte invalide (ex. LAB-HB).");
@@ -456,12 +456,12 @@ class Parametrage {
       }, nouveau: {'libelle': libelle, 'activite': activite, 'compte': compteProduit, 'prix': prix});
 
   static void modifierActe(Session s, String code, {required String libelle, required String compteProduit}) =>
-      _modifier(s, 'parametrage', 'acte:$code', () {
+      modifier(s, 'parametrage', 'acte:$code', () {
         _texte(libelle, 'Le libellé');
         s.base.exec('UPDATE actes_catalogue SET libelle=?, compte_produit=? WHERE code=?', [libelle.trim(), compteProduit, code]);
       }, nouveau: {'libelle': libelle, 'compte': compteProduit});
 
-  static String retirerActe(Session s, String code) => _modifier(s, 'parametrage', 'acte:$code', () {
+  static String retirerActe(Session s, String code) => modifier(s, 'parametrage', 'acte:$code', () {
         final b = s.base;
         if (b.valeur('SELECT 1 FROM actes WHERE code_acte=? LIMIT 1', [code]) != null) {
           b.exec('UPDATE actes_catalogue SET actif=0 WHERE code=?', [code]);
@@ -473,7 +473,7 @@ class Parametrage {
       }, nouveau: 'retiré');
 
   static void reactiverActe(Session s, String code) =>
-      _modifier(s, 'parametrage', 'acte:$code', () => s.base.exec('UPDATE actes_catalogue SET actif=1 WHERE code=?', [code]), nouveau: 'réactivé');
+      modifier(s, 'parametrage', 'acte:$code', () => s.base.exec('UPDATE actes_catalogue SET actif=1 WHERE code=?', [code]), nouveau: 'réactivé');
 
   // ------------------------------------------------------------ programmes de désintoxication
   static void enregistrerProgramme(Session s,
@@ -484,7 +484,7 @@ class Parametrage {
           required String modeCalcul,
           required int montant,
           String phases = ''}) =>
-      _modifier(s, 'parametrage', 'programme:$code', () {
+      modifier(s, 'parametrage', 'programme:$code', () {
         final c = code.trim().toUpperCase();
         if (!RegExp(r'^[A-Z0-9][A-Z0-9_-]{1,11}$').hasMatch(c)) throw const RegleMetier('Code de programme invalide (ex. RES-60).');
         _texte(libelle, 'Le libellé');
@@ -498,7 +498,7 @@ class Parametrage {
             [c, libelle.trim(), type, duree, phases, modeCalcul, montant]);
       }, nouveau: {'libelle': libelle, 'type': type, 'duree': duree, 'calcul': modeCalcul, 'montant': montant});
 
-  static String retirerProgramme(Session s, String code) => _modifier(s, 'parametrage', 'programme:$code', () {
+  static String retirerProgramme(Session s, String code) => modifier(s, 'parametrage', 'programme:$code', () {
         final b = s.base;
         if (b.valeur('SELECT 1 FROM desintox_dossiers WHERE programme=? LIMIT 1', [code]) != null) {
           b.exec('UPDATE programmes_desintox SET actif=0 WHERE code=?', [code]);
@@ -510,7 +510,7 @@ class Parametrage {
 
   // ------------------------------------------------------------ plan comptable
   static void ajouterCompte(Session s, {required String entite, required String numero, required String libelle}) =>
-      _modifier(s, 'comptabilite', 'compte:$entite:$numero', () {
+      modifier(s, 'comptabilite', 'compte:$entite:$numero', () {
         final b = s.base;
         if (!RegExp(r'^[1-9][0-9]{1,9}$').hasMatch(numero)) throw const RegleMetier('Numéro de compte invalide (chiffres uniquement).');
         _texte(libelle, 'Le libellé');
@@ -522,13 +522,13 @@ class Parametrage {
       }, nouveau: libelle);
 
   static void modifierCompte(Session s, {required String entite, required String numero, required String libelle}) =>
-      _modifier(s, 'comptabilite', 'compte:$entite:$numero', () {
+      modifier(s, 'comptabilite', 'compte:$entite:$numero', () {
         _texte(libelle, 'Le libellé');
         s.base.exec('UPDATE comptes SET libelle=? WHERE entite=? AND numero=?', [libelle.trim(), entite, numero]);
       }, nouveau: libelle);
 
   static String retirerCompte(Session s, {required String entite, required String numero}) =>
-      _modifier(s, 'comptabilite', 'compte:$entite:$numero', () {
+      modifier(s, 'comptabilite', 'compte:$entite:$numero', () {
         final b = s.base;
         if (b.valeur("SELECT 1 FROM schemas_ecritures WHERE entite=? AND compte=?", [entite, numero]) != null ||
             b.valeur('SELECT 1 FROM tresoreries WHERE entite=? AND compte=? AND actif=1', [entite, numero]) != null ||
@@ -548,13 +548,13 @@ class Parametrage {
         return 'supprimé';
       }, nouveau: 'retiré');
 
-  static void reactiverCompte(Session s, {required String entite, required String numero}) => _modifier(
+  static void reactiverCompte(Session s, {required String entite, required String numero}) => modifier(
       s, 'comptabilite', 'compte:$entite:$numero', () => s.base.exec('UPDATE comptes SET actif=1 WHERE entite=? AND numero=?', [entite, numero]),
       nouveau: 'réactivé');
 
   /// Change le compte (ou la variable) d'une ligne de schéma d'écriture.
   static void modifierSchema(Session s, {required String entite, required String type, required int ordre, required String compte}) =>
-      _modifier(s, 'comptabilite', 'schema:$entite:$type:$ordre', () {
+      modifier(s, 'comptabilite', 'schema:$entite:$type:$ordre', () {
         final b = s.base;
         if (!compte.contains('{') && b.valeur('SELECT 1 FROM comptes WHERE entite=? AND numero=? AND actif=1', [entite, compte]) == null) {
           throw RegleMetier("Le compte $compte n'existe pas dans le plan comptable.");
@@ -565,7 +565,7 @@ class Parametrage {
   // ------------------------------------------------------------ comptes de trésorerie
   static String ajouterTresorerie(Session s,
           {required String entite, required String type, required String libelle, required String compte, String? operateur}) =>
-      _modifier(s, 'parametrage', 'tresorerie:$entite:$libelle', () {
+      modifier(s, 'parametrage', 'tresorerie:$entite:$libelle', () {
         final b = s.base;
         if (!['caisse', 'banque', 'momo'].contains(type)) throw const RegleMetier('Type : caisse, banque ou momo.');
         _texte(libelle, 'Le libellé');
@@ -582,7 +582,7 @@ class Parametrage {
         return id;
       }, nouveau: {'type': type, 'libelle': libelle, 'compte': compte});
 
-  static String retirerTresorerie(Session s, String id) => _modifier(s, 'parametrage', 'tresorerie:$id', () {
+  static String retirerTresorerie(Session s, String id) => modifier(s, 'parametrage', 'tresorerie:$id', () {
         final b = s.base;
         final solde = b.entier('SELECT COALESCE(SUM(montant),0) FROM mouvements_tresorerie WHERE tresorerie=?', [id]);
         if (solde != 0) throw const RegleMetier('Le solde doit être nul : videz d’abord ce compte par un mouvement interne.');

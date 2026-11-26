@@ -17,11 +17,27 @@ import '../cloture/cloture.dart';
 import '../parametrage/parametrage.dart';
 import '../tresorerie/tresorerie.dart';
 
+/// Libellés des types de sortie (sans dépendre du module stocks).
+class Stocks0 {
+  static const libelles = {
+    'delivrance_sejour': 'Délivrance (séjour)',
+    'delivrance_desintox': 'Délivrance (désintox)',
+    'distribution': 'Distribution gratuite',
+    'consommation': 'Consommation',
+    'peremption': 'Périmé',
+    'casse': 'Casse',
+    'perte': 'Perte',
+  };
+}
+
 class Releves {
   static const naturesEcart = ['non realise', 'realise non enregistre', 'montant different', 'autre'];
 
   /// Contenu calculé (lignes + synthèse) pour un service et une date.
   static Map<String, Object?> calculer(Base base, String activite, String date) {
+    if (base.valeur('SELECT type_releve FROM activites WHERE code=?', [activite]) == 'sorties') {
+      return _calculerSorties(base, activite, date);
+    }
     final actes = base.lignes(
         'SELECT a.*, p.numero_dossier FROM actes a LEFT JOIN patients p ON p.id=a.patient '
         'WHERE a.activite=? AND a.date=? AND a.annule=0 ORDER BY a.horodatage, a.piece, a.id',
@@ -52,6 +68,48 @@ class Releves {
       'synthese': {
         'nombre_actes': lignes.length,
         'par_mode': {for (final e in parMode.entries) Modes.libelles[e.key] ?? e.key: e.value},
+        'gratuites': gratuites,
+        'total_encaisse': encaisse,
+        'total_general': lignes.fold<int>(0, (t, l) => t + (l['montant'] as int)),
+      },
+    };
+  }
+
+  /// Relevé journalier des sorties d'une pharmacie : produits et quantités.
+  static Map<String, Object?> _calculerSorties(Base base, String stock, String date) {
+    final ops = base.lignes(
+        "SELECT * FROM operations WHERE type='stock_sortie' AND date_op=? AND donnees LIKE ? AND uuid NOT IN (SELECT uuid_annule FROM annulations) ORDER BY horodatage",
+        [date, '%"stock":"$stock"%']);
+    final lignes = <Map<String, Object?>>[];
+    final parMode = <String, int>{};
+    var encaisse = 0, gratuites = 0;
+    for (final o in ops) {
+      final op = Operation.depuisLigne(o);
+      final mode = op.d<String?>('mode');
+      final libMode = !op.d<bool>('facturer') ? (Stocks0.libelles[op.d('type')] ?? op.d('type')) : (Modes.libelles[mode] ?? mode ?? '');
+      final dossier = op.d<String?>('patient') == null ? null : base.valeur('SELECT numero_dossier FROM patients WHERE id=?', [op.d('patient')]);
+      for (final l in op.d<List>('lignes').cast<Map>()) {
+        final montant = (l['prix'] as int) * (l['quantite'] as int);
+        lignes.add({
+          'n': lignes.length + 1,
+          'heure': heureFr(op.instant),
+          'piece': op.piece,
+          'dossier': dossier ?? '',
+          'acte': '${l['designation']} × ${l['quantite']} (lot ${l['lot']})',
+          'montant': montant,
+          'mode': libMode,
+          'appareil': op.appareil,
+        });
+        parMode['$libMode'] = (parMode['$libMode'] ?? 0) + montant;
+        if (!op.d<bool>('facturer')) gratuites++;
+        if (op.d('type') == 'vente' && Modes.encaissables.contains(mode)) encaisse += montant;
+      }
+    }
+    return {
+      'lignes': lignes,
+      'synthese': {
+        'nombre_actes': lignes.length,
+        'par_mode': parMode,
         'gratuites': gratuites,
         'total_encaisse': encaisse,
         'total_general': lignes.fold<int>(0, (t, l) => t + (l['montant'] as int)),

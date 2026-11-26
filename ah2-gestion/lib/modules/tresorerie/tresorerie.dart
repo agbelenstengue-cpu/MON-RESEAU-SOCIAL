@@ -37,6 +37,7 @@ class Modes {
     credit: 'À crédit',
     gratuit: 'Gratuit',
     priseEnCharge: 'Prise en charge',
+    'carnet': 'Carnet de séances',
   };
 
   static bool estMomo(String m) => m == mtn || m == orange;

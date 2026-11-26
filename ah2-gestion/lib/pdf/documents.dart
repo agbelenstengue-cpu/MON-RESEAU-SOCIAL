@@ -410,7 +410,19 @@ class Documents {
         ligne('Date de sortie', sortie == null ? 'En cours' : dateFr(depuisIso(sortie))),
         ligne('Durée effective', r['duree_effective'] == null ? 'Non renseigné' : '${r['duree_effective']} jours'),
         ligne('Motif de sortie', Desintox.libellesMotifs[r['motif_sortie']] ?? ''),
+        ligne('Montant du programme', _m(r['forfait'] as int)),
+        if ((r['medicaments_factures'] as int) > 0) ligne('Médicaments facturés en plus', _m(r['medicaments_factures'] as int)),
         ligne('Montant total', _m(r['montant_total'] as int)),
+        if ((r['medicaments'] as List).isNotEmpty) ...[
+          pw.SizedBox(height: 10),
+          pw.Text('Médicaments délivrés', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+          pw.SizedBox(height: 4),
+          _tableau(['Date', 'Pièce', 'Produit', 'Quantité', 'Prise en charge', 'Montant'], [
+            for (final x in (r['medicaments'] as List).cast<Map>())
+              [dateFr(depuisIso(x['date'] as String)), '${x['piece']}', '${x['produit']}', '${x['quantite']}',
+                x['facture'] == true ? 'Facturé en plus' : 'Compris dans le forfait (coût)', _m(x['montant'] as int)],
+          ], droite: {3, 5}),
+        ],
         pw.SizedBox(height: 12),
         _tableau(['Date', 'N° de reçu', 'Payé par', 'Mode', 'Montant'], [
           for (final v in versements)

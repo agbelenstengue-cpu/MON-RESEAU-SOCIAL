@@ -6,15 +6,17 @@ import '../noyau/base.dart';
 import '../noyau/outils.dart';
 import 'etats_comptables.dart';
 import 'etats_gestion.dart';
+import 'etats_stocks_hospitalisation.dart';
 import 'modele.dart';
 
-enum Filtre { periode, date, entite, activite, utilisateur, appareil, subvention, tresorerie, racine }
+enum Filtre { periode, date, entite, activite, utilisateur, appareil, subvention, tresorerie, racine, stock, patient }
 
 class Parametres {
   final Filtres filtres;
   final String date;
   final String racine;
-  const Parametres(this.filtres, {required this.date, this.racine = ''});
+  final String? patient;
+  const Parametres(this.filtres, {required this.date, this.racine = '', this.patient});
   Periode get periode => filtres.periode;
   String get entite => filtres.entite ?? 'CS';
 }
@@ -76,6 +78,23 @@ class Catalogue {
     DefRapport('dons', 'Dons et subventions', 'État des dons', 'Par donateur, par nature ; dons au-delà du seuil.', {Filtre.periode, Filtre.subvention},
         (b, p) => EtatsGestion.dons(b, p.filtres)),
     DefRapport('subventions', 'Dons et subventions', 'Suivi des subventions', 'Budget, réalisé et solde par ligne.', {}, (b, p) => EtatsGestion.subventions(b)),
+    DefRapport('stocks_etat', 'Stocks', 'État des stocks et valorisation', 'Quantités par lot et valeur au CUMP.', {Filtre.date, Filtre.stock},
+        (b, p) => EtatsStocks.etat(b, p.filtres.stock, p.date)),
+    DefRapport('stocks_mouvements', 'Stocks', 'Mouvements de stock', 'Entrées et sorties détaillées.', {Filtre.periode, Filtre.stock},
+        (b, p) => EtatsStocks.mouvements(b, p.filtres.stock, p.periode)),
+    DefRapport('stocks_consommations', 'Stocks', 'Consommations, pertes et péremptions', '', {Filtre.periode, Filtre.stock},
+        (b, p) => EtatsStocks.mouvements(b, p.filtres.stock, p.periode, types: const ['consommation', 'distribution', 'peremption', 'casse', 'perte'])),
+    DefRapport('stocks_inventaire', 'Stocks', "Dernier inventaire : écarts", '', {Filtre.stock}, (b, p) => EtatsStocks.inventaire(b, p.filtres.stock ?? 'PHM')),
+    DefRapport('stocks_comptage', 'Stocks', 'Fiche de comptage pour inventaire', '', {Filtre.date, Filtre.stock},
+        (b, p) => EtatsStocks.ficheComptage(b, p.filtres.stock ?? 'PHM', p.date)),
+    DefRapport('dettes_fournisseurs', 'Stocks', 'Dettes fournisseurs', 'Balance des fournisseurs (401).', {Filtre.periode},
+        (b, p) => EtatsComptables.balanceTiers(b, 'CS', p.periode, racine: '401')),
+    DefRapport('occupation', 'Hospitalisation', 'Occupation des lits', 'Lits, patients présents, journées, montant cumulé.', {Filtre.date},
+        (b, p) => EtatsHospitalisation.occupation(b, p.date)),
+    DefRapport('releve_compte', 'Gestion', 'Relevé de compte patient', 'Actes, paiements et solde.', {Filtre.periode, Filtre.patient},
+        (b, p) => EtatsTiers.releveCompte(b, p.patient ?? '', p.periode)),
+    DefRapport('relances', 'Gestion', 'Créances à relancer', 'Patients et organismes qui doivent depuis plus de 30 jours.', {Filtre.date},
+        (b, p) => EtatsTiers.relances(b, p.date)),
     DefRapport('releves_suivi', 'Contrôle', 'Suivi des relevés et des écarts', '', {Filtre.periode}, (b, p) => EtatsGestion.suiviReleves(b, p.periode)),
     DefRapport('anomalies', 'Contrôle', 'Anomalies de synchronisation', '', {Filtre.periode}, (b, p) => EtatsGestion.anomalies(b, p.periode)),
   ];

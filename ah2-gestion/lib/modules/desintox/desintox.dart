@@ -211,7 +211,8 @@ class Desintox {
     final versements = base.lignes(
         'SELECT * FROM desintox_versements WHERE dossier=? AND annule=0 ORDER BY horodatage', [dossierId]);
     final verse = versements.fold<int>(0, (t, v) => t + (v['montant'] as int));
-    final total = d['montant_total'] as int;
+    // Les médicaments facturés en plus du forfait s'ajoutent au total dû.
+    final total = (d['montant_total'] as int) + ((d['medicaments_factures'] as int?) ?? 0);
     final aujourdhui = aLaDate ?? dateIso(base.maintenant);
     String statut;
     String? dateArchivage;
@@ -307,6 +308,25 @@ class Desintox {
       'duree_effective': sortie == null ? null : joursEntre(d['date_entree'] as String, sortie),
       'motif_sortie': d['motif_sortie'],
       'montant_total': sit.total,
+      'forfait': d['montant_total'],
+      'medicaments_factures': d['medicaments_factures'] ?? 0,
+      'medicaments_compris': d['medicaments_compris'] ?? 0,
+      'medicaments': [
+        for (final o in base.lignes(
+            "SELECT * FROM operations WHERE type='stock_sortie' AND donnees LIKE ? AND uuid NOT IN (SELECT uuid_annule FROM annulations) ORDER BY horodatage",
+            ['%"dossier":"$dossierId"%']))
+          for (final l in (jsonDecode(o['donnees'] as String)['lignes'] as List).cast<Map>())
+            {
+              'date': o['date_op'],
+              'piece': o['piece'],
+              'produit': l['designation'],
+              'quantite': l['quantite'],
+              'facture': jsonDecode(o['donnees'] as String)['facturer'] == true,
+              'montant': jsonDecode(o['donnees'] as String)['facturer'] == true
+                  ? (l['prix'] as int) * (l['quantite'] as int)
+                  : (l['cout'] as int) * (l['quantite'] as int),
+            }
+      ],
       'versements': sit.versements,
       'total_verse': sit.verse,
       'reste': sit.reste,

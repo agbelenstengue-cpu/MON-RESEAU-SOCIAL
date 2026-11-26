@@ -13,6 +13,7 @@ import '../etat_app.dart';
 import '../widgets/commun.dart';
 import '../widgets/enregistrer_fichier.dart';
 import '../widgets/pdf_ui.dart';
+import 'patients.dart';
 
 class EcranRapports extends StatefulWidget {
   const EcranRapports({super.key});
@@ -33,6 +34,8 @@ class _EcranRapportsState extends State<EcranRapports> {
   String? _appareil;
   String? _subvention;
   String? _tresorerie;
+  String? _stock;
+  String? _patient;
   final _racine = TextEditingController();
 
   Periode _periode(DateTime ref) {
@@ -61,9 +64,11 @@ class _EcranRapportsState extends State<EcranRapports> {
           utilisateur: _utilisateur,
           appareil: _appareil,
           subvention: _subvention,
-          tresorerie: _tresorerie),
+          tresorerie: _tresorerie,
+          stock: _stock),
       date: dateIso(ref),
       racine: _racine.text.trim(),
+      patient: _patient,
     );
     Rapport? produit;
     String? erreur;
@@ -225,6 +230,19 @@ class _EcranRapportsState extends State<EcranRapports> {
         liste('Caisse ou banque', _tresorerie,
             [for (final t in b.lignes('SELECT id, libelle, entite FROM tresoreries ORDER BY entite, id')) (t['id'] as String, '${t['libelle']} (${t['entite']})')],
             (v) => _tresorerie = v),
+      if (f.contains(Filtre.stock))
+        liste('Stock', _stock, const [('PHM', 'Pharmacie moderne'), ('PHT', 'Pharmacie traditionnelle'), ('LAB', 'Réactifs du laboratoire')], (v) => _stock = v),
+      if (f.contains(Filtre.patient))
+        OutlinedButton.icon(
+          icon: const Icon(Icons.person_search_outlined),
+          label: Text(_patient == null
+              ? 'Choisir le patient'
+              : '${b.valeur("SELECT nom || ' ' || prenoms FROM patients WHERE id=?", [_patient]) ?? ''}'),
+          onPressed: () async {
+            final id = await choisirPatient(context);
+            if (id != null) setState(() => _patient = id);
+          },
+        ),
       if (f.contains(Filtre.racine))
         SizedBox(
           width: 200,

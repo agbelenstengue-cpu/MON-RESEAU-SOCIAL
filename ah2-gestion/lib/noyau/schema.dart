@@ -674,5 +674,7 @@ CREATE TABLE immobilisations (
 -- ---------- Désintoxication : médicaments facturés en plus du forfait
 ALTER TABLE desintox_dossiers ADD COLUMN medicaments_factures INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE desintox_dossiers ADD COLUMN medicaments_compris INTEGER NOT NULL DEFAULT 0;
+-- ---------- Actes rattachés à un séjour d'hospitalisation
+ALTER TABLE actes ADD COLUMN sejour TEXT;
 """,
 };

@@ -16,6 +16,7 @@ import '../theme.dart';
 import '../widgets/commun.dart';
 import '../widgets/pdf_ui.dart';
 import 'patients.dart';
+import 'stocks_ecran.dart';
 
 class EcranDesintox extends StatefulWidget {
   const EcranDesintox({super.key});
@@ -320,6 +321,11 @@ class FicheDesintox extends StatelessWidget {
             icon: const Icon(Icons.picture_as_pdf_outlined),
             label: const Text('Rapport de sortie du patient (PDF)'),
           ),
+          if (enCours && s.peut('stocks', 'creer'))
+            OutlinedButton.icon(
+                onPressed: () => ouvrirSortieStock(context, stock: 'PHM', type: 'delivrance_desintox', dossier: id),
+                icon: const Icon(Icons.medication_outlined),
+                label: const Text('Délivrer des médicaments')),
           if (enCours && s.peut('desintox', 'creer'))
             OutlinedButton.icon(onPressed: () => _sortie(context), icon: const Icon(Icons.logout), label: const Text('Enregistrer la sortie')),
           if (s.peut('desintox', 'valider'))

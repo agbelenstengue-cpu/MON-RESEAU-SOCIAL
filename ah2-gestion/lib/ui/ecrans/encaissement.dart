@@ -5,6 +5,7 @@ library;
 import 'package:material_ui/material_ui.dart';
 
 import '../../modules/actes/actes.dart';
+import '../../modules/facturation/facturation.dart';
 import '../../modules/parametrage/parametrage.dart';
 import '../../modules/patients/patients.dart';
 import '../../modules/tresorerie/tresorerie.dart';
@@ -13,6 +14,7 @@ import '../../noyau/outils.dart';
 import '../etat_app.dart';
 import '../theme.dart';
 import '../widgets/commun.dart';
+import '../widgets/formulaire.dart';
 import '../widgets/pdf_ui.dart';
 import 'patients.dart';
 
@@ -66,7 +68,10 @@ class _EcranEncaissementState extends State<EcranEncaissement> {
     return Column(children: [
       Expanded(
         child: PageContenu(largeurMax: 720, enfants: [
-          if (caisse != null) Text(caisse, style: TextStyle(color: Theme.of(context).hintColor)),
+          Row(children: [
+            if (caisse != null) Expanded(child: Text(caisse, style: TextStyle(color: Theme.of(context).hintColor))),
+            TextButton.icon(onPressed: () => _carnets(context), icon: const Icon(Icons.confirmation_number_outlined), label: const Text('Carnets de séances')),
+          ]),
           const SizedBox(height: 12),
           Etape('1', 'Patient',
               child: Carte(
@@ -249,5 +254,73 @@ class _EcranEncaissementState extends State<EcranEncaissement> {
         child: const Text('Nouvel encaissement'),
       ),
     ]);
+  }
+
+  void _carnets(BuildContext context) {
+    final etat = Etat.lire(context);
+    final b = etat.base!;
+    showDialog<void>(
+      context: context,
+      builder: (c) => StatefulBuilder(builder: (c, maj) {
+        final carnets = b.lignes(
+            'SELECT k.*, a.libelle, p.nom, p.prenoms FROM carnets k JOIN actes_catalogue a ON a.code=k.acte LEFT JOIN patients p ON p.id=k.patient '
+            'WHERE k.consommees < k.seances ORDER BY k.date DESC');
+        return AlertDialog(
+          title: const Text('Carnets de séances (massages et soins)'),
+          content: SizedBox(
+            width: 520,
+            height: 420,
+            child: ListView(children: [
+              for (final k in carnets)
+                ListTile(
+                  title: Text('${k['libelle']} · ${k['nom'] ?? 'sans patient'} ${k['prenoms'] ?? ''}'),
+                  subtitle: Text('${k['consommees']} séance(s) consommée(s) sur ${k['seances']} · payé ${fcfa(k['montant'] as int)}'),
+                  trailing: FilledButton(
+                    onPressed: () {
+                      if (reussir(c, () => Facturation.consommerSeance(etat.session!, k['id'] as String), succes: 'Séance enregistrée.')) maj(() {});
+                    },
+                    child: const Text('Séance'),
+                  ),
+                ),
+              if (carnets.isEmpty) const EtatVide('Aucun carnet en cours.'),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Fermer')),
+            FilledButton(
+              onPressed: () async {
+                final patient = await choisirPatient(c);
+                if (!c.mounted) return;
+                final prestations = [
+                  for (final a in b.lignes("SELECT code, libelle FROM actes_catalogue WHERE activite='MASS' AND actif=1 ORDER BY libelle")) (a['code'] as String, a['libelle'] as String)
+                ];
+                await formulaire(c, 'Vendre un carnet', [
+                  Champ('acte', 'Prestation', choix: prestations),
+                  const Champ('seances', 'Nombre de séances', nombre: true, initial: '5'),
+                  const Champ('montant', 'Prix du carnet (FCFA)', nombre: true),
+                  Champ('mode', 'Mode de paiement', choix: [for (final m in Modes.encaissables) (m, Modes.libelles[m]!)]),
+                  const Champ('reference', 'Référence (mobile money)'),
+                ], (d, v) {
+                  final op = executer(
+                      d,
+                      () => Facturation.vendreCarnet(etat.session!,
+                          acte: v['acte']!,
+                          seances: int.tryParse(v['seances']!) ?? 0,
+                          montant: int.tryParse(v['montant']!) ?? 0,
+                          patient: patient,
+                          mode: v['mode']!,
+                          reference: v['reference']!.isEmpty ? null : v['reference']),
+                      succes: 'Carnet vendu.');
+                  if (op != null) Future.microtask(() => context.mounted ? afficherRecu(context, op.uuid) : null);
+                  return op != null;
+                });
+                maj(() {});
+              },
+              child: const Text('Vendre un carnet'),
+            ),
+          ],
+        );
+      }),
+    );
   }
 }
