@@ -229,6 +229,22 @@ class Parametrage {
     });
   }
 
+  /// Charte des documents : identité de l'entité (en-tête commune).
+  static void modifierEntite(Session s, String code,
+      {required String nom, required String sigle, required String adresse, required String contacts, required String numeros}) {
+    final base = s.base;
+    base.transaction(() {
+      _exigerCentral(base);
+      s.exiger('parametrage', 'creer');
+      final avant = base.ligne('SELECT * FROM entites WHERE code=?', [code]);
+      base.exec('UPDATE entites SET nom=?, sigle=?, adresse=?, contacts=?, numeros_administratifs=? WHERE code=?',
+          [nom, sigle, adresse, contacts, numeros, code]);
+      _versionSuivante(base);
+      Audit.tracer(base, utilisateur: s.utilisateur, action: 'modification', objet: 'entite:$code', ancien: avant,
+          nouveau: {'nom': nom, 'sigle': sigle, 'adresse': adresse, 'contacts': contacts, 'numeros': numeros});
+    });
+  }
+
   /// Modifie un seuil ou un délai.
   static void modifierParametre(Session s, String cle, String valeur) {
     final base = s.base;

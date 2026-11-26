@@ -10,6 +10,7 @@ import 'dart:convert';
 import '../../noyau/base.dart';
 import '../../noyau/operations.dart';
 import '../../noyau/outils.dart';
+import '../../noyau/pieces_jointes.dart';
 import '../../noyau/session.dart';
 import '../comptabilite/moteur.dart';
 
@@ -127,6 +128,7 @@ class Tresorerie {
     required int montant,
     String? tresorerie,
     String? pieceJointe,
+    Map<String, Object?>? fichier,
     String? subvention,
     String? reference,
   }) {
@@ -139,7 +141,7 @@ class Tresorerie {
       if (!compteCharge.startsWith('6') && !compteCharge.startsWith('2') && !compteCharge.startsWith('4')) {
         throw const RegleMetier('Imputation invalide : choisissez un compte de charge (classe 6).');
       }
-      if (montant > base.paramInt('seuil_piece_jointe') && (pieceJointe == null || pieceJointe.isEmpty)) {
+      if (montant > base.paramInt('seuil_piece_jointe') && fichier == null && (pieceJointe == null || pieceJointe.isEmpty)) {
         throw RegleMetier('Pièce jointe obligatoire au-delà de ${fcfa(base.paramInt('seuil_piece_jointe'))}.');
       }
       final treso = tresorerie ?? caisseDe(base, entite);
@@ -155,7 +157,8 @@ class Tresorerie {
         'activite': activite,
         'montant': montant,
         'tresorerie': treso,
-        'piece_jointe': pieceJointe,
+        'piece_jointe': fichier?['sha256'] ?? pieceJointe,
+        'fichier': fichier,
         'subvention': subvention,
         'reference': reference,
         'a_valider': aValider,
@@ -288,6 +291,7 @@ class _Depense extends TypeOperation {
 
   @override
   void appliquer(Base base, Operation op) {
+    PiecesJointes.enregistrer(base, op, op.donnees['fichier']);
     final aValider = op.d<bool>('a_valider');
     base.exec(
         'INSERT INTO depenses(uuid_op, entite, piece, date, beneficiaire, motif, compte, activite, subvention, tresorerie, montant, piece_jointe, statut) '

@@ -449,11 +449,12 @@ CREATE TABLE subventions_tranches_recues (
   annule INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 
+-- Pièces jointes (photos, scans) : synchronisées avec l'opération qui les porte.
 CREATE TABLE pieces_jointes (
-  id TEXT PRIMARY KEY,
-  uuid_op TEXT,
-  chemin TEXT NOT NULL,
-  sha256 TEXT NOT NULL,
+  sha256 TEXT PRIMARY KEY,
+  uuid_op TEXT NOT NULL,
+  nom TEXT NOT NULL,
+  contenu BLOB NOT NULL,
   ajoute_le TEXT NOT NULL
 ) STRICT;
 

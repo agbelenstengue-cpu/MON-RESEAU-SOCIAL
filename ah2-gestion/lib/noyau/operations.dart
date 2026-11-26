@@ -214,7 +214,7 @@ class Operations {
           utilisateur: s.utilisateur,
           action: type == 'annulation' ? 'annulation' : 'creation',
           objet: '${t.libelle}${piece != null ? ' $piece' : ''} [${op.uuid}]',
-          nouveau: donnees);
+          nouveau: _sansContenu(donnees));
       return op;
     });
   }
@@ -257,10 +257,15 @@ class Operations {
           appareil: op.appareil,
           action: 'synchronisation',
           objet: '${t.libelle}${op.piece != null ? ' ${op.piece}' : ''} [${op.uuid}]',
-          nouveau: op.donnees);
+          nouveau: _sansContenu(op.donnees));
     });
     return true;
   }
+
+  /// Le journal d'audit garde l'empreinte des pièces jointes, pas leur contenu.
+  static Map<String, Object?> _sansContenu(Map<String, Object?> d) => d['fichier'] is Map
+      ? {...d, 'fichier': {'nom': (d['fichier'] as Map)['nom'], 'sha256': (d['fichier'] as Map)['sha256']}}
+      : d;
 
   static void signalerAnomalie(Base base, String type, String? uuidOp, String detail) => base.exec(
       'INSERT INTO anomalies_sync(horodatage, type, uuid_op, detail) VALUES (?,?,?,?)',

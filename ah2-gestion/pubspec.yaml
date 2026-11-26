@@ -8,8 +8,13 @@ environment:
 
 dependencies:
   crypto: ^3.0.8
+  cupertino_ui: ^1.1.7
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_secure_storage: ^11.2.0
+  image_picker: ^1.2.4
   material_ui: ^1.1.0
   path: ^1.9.1
   path_provider: ^2.1.6
@@ -27,3 +32,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+# Base locale chiffrée (SQLite3MultipleCiphers) : PRAGMA key.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc

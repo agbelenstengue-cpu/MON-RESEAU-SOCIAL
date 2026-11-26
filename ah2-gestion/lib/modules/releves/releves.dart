@@ -11,6 +11,7 @@ import '../../noyau/base.dart';
 import '../../noyau/numerotation.dart';
 import '../../noyau/operations.dart';
 import '../../noyau/outils.dart';
+import '../../noyau/pieces_jointes.dart';
 import '../../noyau/session.dart';
 import '../cloture/cloture.dart';
 import '../parametrage/parametrage.dart';
@@ -98,12 +99,13 @@ class Releves {
       ];
 
   /// Le comptable marque le relevé « Retourné signé » et joint le scan.
-  static Operation marquerRetourne(Session s, String numero, {required String scan}) {
+  static Operation marquerRetourne(Session s, String numero, {String? scan, Map<String, Object?>? fichier}) {
     final base = s.base;
     final r = base.ligne('SELECT * FROM releves WHERE numero=?', [numero]) ?? (throw const RegleMetier('Relevé introuvable.'));
     if (r['statut'] == 'retourne_signe') throw const RegleMetier('Ce relevé est déjà marqué retourné signé.');
-    if (scan.isEmpty) throw const RegleMetier('Joignez la photo ou le scan du relevé signé.');
-    return Operations.enregistrer(s, type: 'releve_retour', entite: 'CS', donnees: {'numero': numero, 'scan': scan});
+    if (fichier == null && (scan == null || scan.isEmpty)) throw const RegleMetier('Joignez la photo ou le scan du relevé signé.');
+    return Operations.enregistrer(s,
+        type: 'releve_retour', entite: 'CS', donnees: {'numero': numero, 'scan': fichier?['sha256'] ?? scan, 'fichier': fichier});
   }
 
   static Operation saisirEcart(Session s,
@@ -189,8 +191,10 @@ class _Retour extends _Admin {
   @override
   String get libelle => 'Retour de relevé signé';
   @override
-  void appliquer(Base base, Operation op) => base.exec(
-      "UPDATE releves SET statut='retourne_signe', scan=? WHERE numero=?", [op.d('scan'), op.d('numero')]);
+  void appliquer(Base base, Operation op) {
+    PiecesJointes.enregistrer(base, op, op.donnees['fichier']);
+    base.exec("UPDATE releves SET statut='retourne_signe', scan=? WHERE numero=?", [op.d('scan'), op.d('numero')]);
+  }
 }
 
 class _Ecart extends _Admin {

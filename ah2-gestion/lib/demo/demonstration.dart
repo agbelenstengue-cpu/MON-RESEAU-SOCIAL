@@ -76,7 +76,7 @@ class Demo {
           echeancier: [
             for (var i = 0; i < 6; i++) Echeance(_iso(jour(jours - 4 - i * 5, 0, 0)), 75000),
           ]).d<String>('id');
-      for (var d = jours; d >= 1; d--) {
+      for (var d = jours; d >= 0; d--) {
         var minute = 0;
         void a(String act, List<String> codes, String mode, int p) {
           minute += 7 + r.nextInt(20);
