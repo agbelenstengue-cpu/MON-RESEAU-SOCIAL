@@ -20,9 +20,10 @@ Les échanges sont **chiffrés** (AES-256) avec une clé propre à chaque appare
 
 1. Lancez l'installateur `AH2-Gestion-Setup.exe` (voir la section 8 pour le produire).
 2. Au premier démarrage, choisissez **« Ce PC est le PC central »** et gardez le code `PC1`.
-3. Choisissez le mot de passe administrateur. L'identifiant est `admin`.
-   - Pour un essai, cochez plutôt « données de démonstration » : tous les comptes de démonstration ont le mot de passe `demo1234`.
-4. Connectez-vous en `admin`, puis dans **Paramétrage** :
+3. Cliquez sur **Installer le PC central**. Aucun mot de passe n'est demandé : le logiciel s'ouvre directement sur le compte du **comptable**, avec tous les menus et les listes de base déjà remplies (examens, natures de dépenses, programmes, remèdes AE et SE).
+   - Pour un essai, cochez plutôt « données de démonstration ». On en sort par le menu du compte (en haut à droite) › **Quitter la démonstration** : les données fictives sont effacées et l'installation réelle peut commencer.
+   - Pour exiger un identifiant et un mot de passe plus tard : **Paramétrage › Seuils et paramètres › Demander un identifiant et un mot de passe à l'ouverture**.
+4. Suivez la carte **Mise en route** de l'accueil, puis dans **Paramétrage** :
    - **Structure** : saisissez nom, adresse, contacts et numéros administratifs de chaque entité. Ils figureront en en-tête de tous les documents.
    - **Utilisateurs** : créez un compte personnel pour chaque personne (comptable, caissiers, agents, direction…), avec un mot de passe et un code court pour le téléphone. **Aucun compte partagé.**
    - **Tarifs**, **Seuils et délais** : remplacez les valeurs de démonstration.

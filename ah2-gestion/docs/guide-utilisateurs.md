@@ -1,14 +1,28 @@
 # Guides utilisateurs par rôle, AH2 Gestion
 
-Chaque personne a **son propre identifiant**. Sur PC, on se connecte avec un mot de passe. Sur téléphone, on se connecte avec un code court. Toute action est tracée : qui, quand, sur quel appareil.
-
-La session se ferme seule après quelques minutes d'inactivité. Le compte se verrouille après 5 mots de passe erronés.
+Par défaut, le logiciel **s'ouvre directement** (après le logo animé, qu'un toucher permet de passer) sur le compte du comptable, sans identifiant ni mot de passe. Le comptable peut exiger une connexion par personne dans Paramétrage ; chacun a alors son identifiant, un mot de passe sur PC et un code court sur téléphone. Toute action est tracée : qui, quand, sur quel appareil.
 
 Sur tous les écrans :
 
 - le **bouton (+)** donne accès aux actions rapides : encaissement, patient, versement, dépense ;
 - la **loupe** cherche un patient, un reçu ou un donateur ;
-- le **menu du compte** permet de passer en mode clair ou sombre, de régler la taille du texte et de se déconnecter.
+- le **menu du compte** permet de passer en mode clair ou sombre, de régler la taille du texte et, en démonstration, de **quitter la démonstration** ;
+- l'**accueil** regroupe les gestes du jour : encaisser, examen de laboratoire, dépense ou achat, servir les remèdes, compte rendu du soir, statistiques ;
+- sur téléphone, la barre du bas donne **Accueil, Encaisser, Labo, Dépenses** et **Plus** pour le reste ;
+- chaque document (reçu, rapport, état) s'**affiche** dans le logiciel, puis s'**enregistre** (Téléchargements ou autre dossier), se **partage** (WhatsApp, e-mail) ou s'**imprime**. Une copie reste dans **Mes documents**.
+
+## Gestes du quotidien
+
+- **Laboratoire** : *Nouvel examen* : client divers (nom facultatif) ou patient enregistré, cocher les examens, mode de paiement, *À réaliser* ou *Déjà réalisé*. *Examens du jour* : suivi demandé, réalisé, résultat remis (flèche). *Liste et prix des examens* : ajouter, renommer, changer le prix (à partir d'aujourd'hui, le passé ne change pas), retirer. *Réactifs* : réception et réactifs utilisés.
+- **Dépenses et achats** : toucher la nature (électricité, eau, carburant, loyer…), saisir le montant : le compte est trouvé tout seul. *Achat simple* ou *Achat pour le stock* (payé comptant ou à crédit). Les **dépenses répétitives** (loyer, abonnements) sont rappelées chaque mois avec un bouton *Payer*.
+- **Remèdes AE, SE** : entrée en litres (taille du bidon libre) par *Achat pour le stock › Pharmacie traditionnelle*. *Désintoxication › Servir les remèdes du jour* : tous les patients présents sont cochés à 1 litre (modifiable), un seul *Enregistrer*. Le coût est compris dans l'abonnement et figure sur la fiche de suivi. Le prix du litre se change dans *Programmes et prix du litre* (comptable), daté et tracé.
+- **Abonnement de désintoxication** : sur la fiche du patient, carte *Abonnement* › *Modifier* (motif obligatoire, tracé). Le montant des programmes se change dans *Désintoxication › Programmes et prix du litre*.
+- **Fiche de suivi** du patient interné (désintoxication ou hospitalisation) : tout ce qui a été donné jour par jour, versements, reste dû, coût réel comparé à l'abonnement. Imprimable à tout moment.
+- **Compte rendu du soir** : bouton de l'accueil. Le logiciel prépare l'activité de chaque service, les dépenses, les caisses, la désintoxication, l'hospitalisation et les alertes ; le comptable ajoute ses **observations** puis *Envoyer (WhatsApp…)*.
+- **Reprise des mois passés** (comptable) : icône calendrier en haut ; choisir la date. Un bandeau orange rappelle la date de saisie. Chaque opération garde sa date et l'heure réelle de saisie (état *Contrôle › Saisies à une date passée*). Les journées clôturées restent protégées.
+- **Changement d'année** : rien à faire pour continuer à saisir ; la numérotation repart par année. Dans *Rapports*, le choix **Exercice** donne l'année voulue. La clôture de l'exercice (comptabilité) passe les à-nouveaux.
+- **Statistiques** : courbes recettes et charges, fréquentation, répartitions par service et par nature ; export PDF et Excel.
+- **Contrôle** (Rapports) : annulations, gratuités et remises, écarts de caisse, changements de prix et de paramètres, saisies à une date passée, journal d'audit filtrable ; tous imprimables.
 
 ---
 

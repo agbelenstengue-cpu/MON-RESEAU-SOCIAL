@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -29,11 +31,24 @@ android {
         versionName = flutter.versionName
     }
 
+    // Signature stable : chaque nouvelle version s'installe par-dessus
+    // l'ancienne, sans désinstaller (les données du téléphone sont gardées).
+    val signature = Properties().apply {
+        val f = file("signature.properties")
+        if (f.exists()) f.inputStream().use { load(it) }
+    }
+    signingConfigs {
+        create("ah2") {
+            storeFile = file(signature.getProperty("storeFile", "ah2-signature.jks"))
+            storePassword = signature.getProperty("storePassword")
+            keyAlias = signature.getProperty("keyAlias")
+            keyPassword = signature.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (signature.isEmpty()) signingConfigs.getByName("debug") else signingConfigs.getByName("ah2")
         }
     }
 }

@@ -81,6 +81,18 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Clé de signature stable (secrets du dépôt)
+        env:
+          CLE_B64: ${{ secrets.AH2_ANDROID_CLE }}
+          CLE_MDP: ${{ secrets.AH2_ANDROID_MDP }}
+        run: |
+          if [ -n "$CLE_B64" ] && [ -n "$CLE_MDP" ]; then
+            echo "$CLE_B64" | base64 -d > android/app/ah2-signature.jks
+            printf 'storeFile=ah2-signature.jks\nstorePassword=%s\nkeyAlias=ah2\nkeyPassword=%s\n' "$CLE_MDP" "$CLE_MDP" > android/app/signature.properties
+            echo "APK signé avec la clé stable de la structure."
+          else
+            echo "::warning::Secrets AH2_ANDROID_CLE et AH2_ANDROID_MDP absents : APK signé avec une clé temporaire."
+          fi
       - name: Construire l'APK
         run: flutter build apk --release --build-number ${{ github.run_number }}
       - name: Nommer l'APK
