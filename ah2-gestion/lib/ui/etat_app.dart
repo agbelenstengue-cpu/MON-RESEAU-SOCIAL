@@ -123,6 +123,55 @@ class EtatApp extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Ouverture directe (choix A) : pas d'identifiant ni de mot de passe tant
+  /// que le paramètre « connexion_requise » vaut 0. Réversible dans le
+  /// paramétrage.
+  bool get connexionRequise => base?.param('connexion_requise', '0') == '1';
+
+  /// Ouvre la session de l'utilisateur par défaut (le comptable). Retourne
+  /// faux si aucun utilisateur ne convient (l'écran de connexion s'affiche).
+  bool ouvrirSansConnexion() {
+    final b = base;
+    if (b == null || session != null || connexionRequise) return session != null;
+    for (final id in [b.param('utilisateur_par_defaut', ''), 'comptable', 'admin']) {
+      if (id.isEmpty) continue;
+      final u = b.ligne('SELECT * FROM utilisateurs WHERE identifiant=? AND actif=1', [id]);
+      if (u != null) {
+        session = Session.depuisLigne(b, u);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Date de saisie choisie par le comptable (reprise de l'historique).
+  String? get dateSaisie => base?.dateSaisie;
+  void changerDateSaisie(String? date) {
+    base?.dateSaisie = date;
+    notifyListeners();
+  }
+
+  /// Quitte la démonstration : la base fictive est effacée, retour à l'installation.
+  void quitterDemonstration() {
+    final chemin = cheminBase;
+    _serveur?.arreter();
+    _serveur = null;
+    _minuteurSync?.cancel();
+    _minuteurSync = null;
+    base?.fermer();
+    session = null;
+    if (chemin != null) {
+      for (final s in ['', '-wal', '-shm']) {
+        final f = File('$chemin$s');
+        if (f.existsSync()) f.deleteSync();
+      }
+    }
+    base = Base.ouvrir(chemin: chemin, appareil: 'PC1', cle: _cle);
+    notifyListeners();
+  }
+
+  bool get demonstration => base?.param('demonstration', '0') == '1';
+
   void deconnecter() {
     session = null;
     _minuteurInactivite?.cancel();
@@ -133,7 +182,7 @@ class EtatApp extends ChangeNotifier {
   void signalerActivite() {
     _minuteurInactivite?.cancel();
     final b = base;
-    if (b == null || session == null) return;
+    if (b == null || session == null || !connexionRequise) return;
     _minuteurInactivite = Timer(Duration(minutes: b.paramInt('inactivite_minutes', 10)), deconnecter);
   }
 

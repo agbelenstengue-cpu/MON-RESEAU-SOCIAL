@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import 'ecrans/connexion.dart';
 import 'ecrans/coquille.dart';
 import 'ecrans/installation.dart';
+import 'ecrans/ouverture.dart';
 import 'etat_app.dart';
 import 'theme.dart';
 
@@ -47,15 +48,25 @@ class Ah2App extends StatelessWidget {
       );
 }
 
-class _Aiguillage extends StatelessWidget {
+class _Aiguillage extends StatefulWidget {
   const _Aiguillage();
+  @override
+  State<_Aiguillage> createState() => _AiguillageState();
+}
+
+class _AiguillageState extends State<_Aiguillage> {
+  /// Le logo animé ne s'affiche qu'à l'ouverture (désactivé dans les tests).
+  bool _logo = !const bool.fromEnvironment('AH2_SANS_LOGO') && !_enTest;
+
+  static bool get _enTest => WidgetsBinding.instance.runtimeType.toString().contains('Test');
 
   @override
   Widget build(BuildContext context) {
     final etat = Etat.de(context);
+    if (_logo) return LogoAnime(fini: () => setState(() => _logo = false));
     if (etat.revoque) return const _Revoque();
     if (!etat.installe) return const EcranInstallation();
-    if (etat.session == null) return const EcranConnexion();
+    if (etat.session == null && !etat.ouvrirSansConnexion()) return const EcranConnexion();
     return const Coquille();
   }
 }

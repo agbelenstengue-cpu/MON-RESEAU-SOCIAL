@@ -156,12 +156,17 @@ class Desintox {
       s.exiger('desintox', 'valider');
       final sit = situation(base, dossierId);
       if (motif.trim().isEmpty) throw const RegleMetier('Le motif est obligatoire.');
-      if (nouveauTotal < sit.verse) throw RegleMetier('Le montant ne peut pas être inférieur au total déjà versé (${fcfa(sit.verse)}).');
-      if (nouveauTotal == sit.total) throw const RegleMetier('Le montant est inchangé.');
+      // Le montant modifié est celui de l'abonnement ; les médicaments facturés en plus restent dus.
+      final abonnement = sit.dossier['montant_total'] as int;
+      final enPlus = sit.total - abonnement;
+      if (nouveauTotal < 0 || nouveauTotal + enPlus < sit.verse) {
+        throw RegleMetier("L'abonnement ne peut pas descendre sous ce qui est déjà versé (${fcfa(sit.verse - enPlus)}).");
+      }
+      if (nouveauTotal == abonnement) throw const RegleMetier('Le montant est inchangé.');
       return Operations.enregistrer(s, type: 'desintox_montant', entite: 'CS', donnees: {
         'dossier': dossierId,
         'patient': sit.dossier['patient'],
-        'ancien': sit.total,
+        'ancien': sit.dossier['montant_total'],
         'nouveau': nouveauTotal,
         'motif': motif.trim(),
       });

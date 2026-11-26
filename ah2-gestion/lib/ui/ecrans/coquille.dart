@@ -10,17 +10,23 @@ import '../etat_app.dart';
 import '../theme.dart';
 import '../widgets/logo.dart';
 import '../widgets/pdf_ui.dart';
+import '../widgets/formulaire.dart';
+import 'assistants.dart';
 import 'caisse.dart';
 import 'comptabilite.dart';
 import 'desintox.dart';
+import 'depenses_ecran.dart';
 import 'dons.dart';
 import 'encaissement.dart';
 import 'hospitalisation_ecran.dart';
+import 'laboratoire.dart';
+import 'mes_documents.dart';
 import 'paie_immo_ecran.dart';
 import 'parametrage_ecran.dart';
 import 'patients.dart';
 import 'rapports_ecran.dart';
 import 'releves.dart';
+import 'statistiques_ecran.dart';
 import 'stocks_ecran.dart';
 import 'synchro.dart';
 import 'tableau_bord.dart';
@@ -30,7 +36,9 @@ class Destination {
   final String libelle;
   String get court => const {
         'accueil': 'Accueil',
-        'encaissement': 'Caisse',
+        'encaissement': 'Encaisser',
+        'laboratoire': 'Labo',
+        'depenses': 'Dépenses',
         'patients': 'Patients',
         'desintox': 'Désintox',
         'caisse': 'Trésorerie',
@@ -52,18 +60,22 @@ bool _peut(EtatApp e, String module, [String action = 'voir']) => e.session!.peu
 final destinations = <Destination>[
   Destination('accueil', 'Tableau de bord', Icons.space_dashboard_outlined, (e) => true, () => const EcranTableauBord()),
   Destination('encaissement', 'Encaissement', Icons.point_of_sale_outlined, (e) => _peut(e, 'actes', 'creer'), () => const EcranEncaissement()),
+  Destination('laboratoire', 'Laboratoire', Icons.biotech_outlined, (e) => _peut(e, 'actes'), () => const EcranLaboratoire()),
+  Destination('depenses', 'Dépenses et achats', Icons.receipt_long_outlined, (e) => _peut(e, 'depenses'), () => const EcranDepenses()),
   Destination('patients', 'Patients', Icons.people_alt_outlined, (e) => _peut(e, 'patients'), () => const EcranPatients()),
   Destination('desintox', 'Désintoxication', Icons.healing_outlined, (e) => _peut(e, 'desintox'), () => const EcranDesintox()),
-  Destination('stocks', 'Pharmacies et stocks', Icons.inventory_2_outlined, (e) => _peut(e, 'stocks'), () => const EcranStocks()),
   Destination('hospitalisation', 'Hospitalisation', Icons.bed_outlined, (e) => _peut(e, 'hospitalisation'), () => const EcranHospitalisation()),
+  Destination('stocks', 'Pharmacies et stocks', Icons.inventory_2_outlined, (e) => _peut(e, 'stocks'), () => const EcranStocks()),
   Destination('caisse', 'Caisse et trésorerie', Icons.account_balance_wallet_outlined,
       (e) => _peut(e, 'caisse') || _peut(e, 'tresorerie'), () => const EcranCaisse()),
+  Destination('rapports', 'Rapports et états', Icons.insert_chart_outlined, (e) => _peut(e, 'rapports'), () => const EcranRapports()),
+  Destination('statistiques', 'Statistiques', Icons.show_chart, (e) => _peut(e, 'statistiques') || _peut(e, 'rapports'), () => const EcranStatistiques()),
+  Destination('comptabilite', 'Comptabilité', Icons.menu_book_outlined, (e) => _peut(e, 'comptabilite'), () => const EcranComptabilite()),
   Destination('paie', 'Personnel et paie', Icons.badge_outlined, (e) => _peut(e, 'paie'), () => const EcranPaie()),
   Destination('immobilisations', 'Immobilisations', Icons.domain_outlined, (e) => _peut(e, 'immobilisations'), () => const EcranImmobilisations()),
   Destination('releves', 'Relevés journaliers', Icons.fact_check_outlined, (e) => _peut(e, 'releves'), () => const EcranReleves()),
   Destination('dons', 'Dons et subventions', Icons.volunteer_activism_outlined, (e) => _peut(e, 'dons'), () => const EcranDons()),
-  Destination('rapports', 'Rapports', Icons.insert_chart_outlined, (e) => _peut(e, 'rapports'), () => const EcranRapports()),
-  Destination('comptabilite', 'Comptabilité', Icons.menu_book_outlined, (e) => _peut(e, 'comptabilite'), () => const EcranComptabilite()),
+  Destination('documents', 'Mes documents', Icons.folder_outlined, (e) => true, () => const EcranMesDocuments()),
   Destination('parametrage', 'Paramétrage', Icons.tune_outlined,
       (e) => _peut(e, 'parametrage') || _peut(e, 'utilisateurs'), () => const EcranParametrage()),
   Destination('synchro', 'Synchronisation', Icons.sync, (e) => true, () => const EcranSynchro()),
@@ -97,17 +109,29 @@ class _CoquilleState extends State<Coquille> {
     final large = MediaQuery.sizeOf(context).width >= 900;
     final contenu = Navigation(
       ouvrir: _ouvrir,
-      child: Filigrane(child: KeyedSubtree(key: ValueKey(dest.id), child: dest.ecran())),
+      child: Column(children: [
+        const BandeauReprise(),
+        Expanded(child: Filigrane(child: KeyedSubtree(key: ValueKey(dest.id), child: dest.ecran()))),
+      ]),
     );
+    final s = etat.session!;
     final barre = AppBar(
       title: Text(dest.libelle, style: const TextStyle(fontWeight: FontWeight.w700)),
       actions: [
         IconButton(tooltip: 'Recherche', icon: const Icon(Icons.search), onPressed: () => _rechercher(context)),
+        if (large && s.peut('rapports', 'voir'))
+          IconButton(tooltip: 'Compte rendu du soir', icon: const Icon(Icons.summarize_outlined), onPressed: () => ouvrirCompteRendu(context)),
+        if (s.peut('retroactif', 'creer'))
+          IconButton(
+            tooltip: 'Date de saisie (reprise des mois passés)',
+            icon: Icon(Icons.edit_calendar_outlined, color: etat.dateSaisie != null ? Couleurs.stable : null),
+            onPressed: () => choisirDateSaisie(context),
+          ),
         _IndicateurSync(compact: !large),
         PopupMenuButton<String>(
           tooltip: 'Compte',
           icon: const Icon(Icons.account_circle_outlined),
-          onSelected: (v) {
+          onSelected: (v) async {
             switch (v) {
               case 'clair':
                 etat.changerTheme(ThemeMode.light);
@@ -119,6 +143,11 @@ class _CoquilleState extends State<Coquille> {
                 etat.changerTailleTexte((etat.tailleTexte - 0.1).clamp(0.8, 1.6));
               case 'quitter':
                 etat.deconnecter();
+              case 'demo':
+                if (await confirmer(context,
+                    'Quitter la démonstration ? Toutes les données fictives seront effacées et vous pourrez installer le logiciel pour la structure.')) {
+                  etat.quitterDemonstration();
+                }
             }
           },
           itemBuilder: (_) => [
@@ -127,13 +156,14 @@ class _CoquilleState extends State<Coquille> {
             const PopupMenuItem(value: 'sombre', child: Text('Mode sombre')),
             const PopupMenuItem(value: 'texte+', child: Text('Agrandir le texte')),
             const PopupMenuItem(value: 'texte-', child: Text('Réduire le texte')),
-            const PopupMenuItem(value: 'quitter', child: Text('Se déconnecter')),
+            if (etat.connexionRequise) const PopupMenuItem(value: 'quitter', child: Text('Se déconnecter')),
+            if (etat.demonstration) const PopupMenuItem(value: 'demo', child: Text('Quitter la démonstration')),
           ],
         ),
         const SizedBox(width: 8),
       ],
     );
-    final fab = dest.id == 'encaissement'
+    final fab = const {'encaissement', 'laboratoire', 'documents'}.contains(dest.id)
         ? null
         : FloatingActionButton(
       tooltip: 'Actions rapides',
@@ -194,6 +224,7 @@ class _CoquilleState extends State<Coquille> {
   void _actionsRapides(BuildContext context, EtatApp etat) => showModalBottomSheet<void>(
         context: context,
         showDragHandle: true,
+        isScrollControlled: true,
         builder: (c) {
           ListTile tuile(IconData i, String t, VoidCallback f) => ListTile(
                 leading: CircleAvatar(child: Icon(i)),
@@ -205,14 +236,17 @@ class _CoquilleState extends State<Coquille> {
               );
           final s = etat.session!;
           return SafeArea(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
+            child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               if (s.peut('actes', 'creer')) tuile(Icons.point_of_sale, 'Nouvel encaissement', () => _ouvrir('encaissement')),
+              if (s.peut('actes', 'creer')) tuile(Icons.biotech_outlined, 'Nouvel examen de laboratoire', () => _ouvrir('laboratoire')),
               if (s.peut('patients', 'creer'))
                 tuile(Icons.person_add_alt, 'Nouveau patient', () => nouveauPatient(context)),
               if (s.peut('desintox', 'creer'))
                 tuile(Icons.payments_outlined, 'Nouveau versement en désintoxication', () => _ouvrir('desintox')),
-              if (s.peut('depenses', 'creer')) tuile(Icons.receipt_long, 'Nouvelle dépense', () => nouvelleDepense(context)),
-            ]),
+              if (s.peut('depenses', 'creer')) tuile(Icons.receipt_long, 'Dépense ou achat', () => _ouvrir('depenses')),
+              if (s.peut('stocks', 'creer')) tuile(Icons.local_drink_outlined, 'Servir les remèdes du jour', () => servirRemedes(context)),
+              if (s.peut('rapports', 'voir')) tuile(Icons.summarize_outlined, 'Compte rendu du soir', () => ouvrirCompteRendu(context)),
+            ])),
           );
         },
       );

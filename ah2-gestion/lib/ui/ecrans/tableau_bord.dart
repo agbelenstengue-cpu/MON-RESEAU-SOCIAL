@@ -9,6 +9,12 @@ import '../etat_app.dart';
 import '../theme.dart';
 import '../widgets/commun.dart';
 import '../../rapports/etats_phase3.dart';
+import '../../modules/depenses/depenses.dart';
+import '../../modules/stocks/stocks.dart';
+import 'assistants.dart';
+import 'coquille.dart';
+import 'depenses_ecran.dart';
+import 'desintox.dart';
 
 class EcranTableauBord extends StatelessWidget {
   const EcranTableauBord({super.key});
@@ -31,7 +37,10 @@ class EcranTableauBord extends StatelessWidget {
           style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
       const SizedBox(height: 4),
       Text(rapport['note'] as String, style: t.bodyMedium?.copyWith(color: Theme.of(context).hintColor)),
-      const SizedBox(height: 20),
+      const SizedBox(height: 16),
+      const CarteMiseEnRoute(),
+      const _ActionsDuJour(),
+      const SizedBox(height: 16),
       GridView.count(
         crossAxisCount: larg >= 1100 ? 4 : (larg >= 600 ? 2 : 2),
         shrinkWrap: true,
@@ -208,5 +217,65 @@ class Courbes12Mois extends StatelessWidget {
           ),
       ]),
     );
+  }
+}
+
+
+/// Les gestes du quotidien, à un toucher de l'accueil.
+class _ActionsDuJour extends StatelessWidget {
+  const _ActionsDuJour();
+  @override
+  Widget build(BuildContext context) {
+    final etat = Etat.de(context);
+    final b = etat.base!;
+    final s = etat.session!;
+    final nav = Navigation.de(context);
+    final aPayer = s.peut('depenses', 'creer') ? Depenses.aPayerCeMois(b).where((m) => m['payee'] != true).toList() : const <Map<String, Object?>>[];
+    Widget action(IconData i, String t, VoidCallback f) => SizedBox(
+          width: 168,
+          child: Carte(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            onTap: f,
+            child: Row(children: [
+              Icon(i, color: Couleurs.primaire),
+              const SizedBox(width: 10),
+              Expanded(child: Text(t, style: const TextStyle(fontWeight: FontWeight.w600))),
+            ]),
+          ),
+        );
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Wrap(spacing: 10, runSpacing: 10, children: [
+        if (s.peut('actes', 'creer')) action(Icons.point_of_sale_outlined, 'Encaisser', () => nav.ouvrir('encaissement')),
+        if (s.peut('actes', 'creer')) action(Icons.biotech_outlined, 'Examen de laboratoire', () => nav.ouvrir('laboratoire')),
+        if (s.peut('depenses', 'creer')) action(Icons.receipt_long_outlined, 'Dépense ou achat', () => nav.ouvrir('depenses')),
+        if (s.peut('desintox', 'creer')) action(Icons.healing_outlined, 'Désintoxication', () => nav.ouvrir('desintox')),
+        if (s.peut('stocks', 'creer') && Stocks.remedes(b).isNotEmpty)
+          action(Icons.local_drink_outlined, 'Servir les remèdes', () => servirRemedes(context)),
+        if (s.peut('rapports', 'voir')) action(Icons.summarize_outlined, 'Compte rendu du soir', () => ouvrirCompteRendu(context)),
+        if (s.peut('rapports', 'voir')) action(Icons.show_chart, 'Statistiques', () => nav.ouvrir('statistiques')),
+      ]),
+      if (aPayer.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+              color: Couleurs.alerteOrangeFond, border: Border.all(color: Couleurs.alerteOrangeBord), borderRadius: BorderRadius.circular(8)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Dépenses répétitives à payer ce mois', style: TextStyle(fontWeight: FontWeight.w700, color: Couleurs.encre)),
+            for (final m in aPayer)
+              Row(children: [
+                Expanded(
+                  child: Text('${m['libelle']} : ${m['beneficiaire']} · ${fcfa(m['montant'] as int)} · le ${dateFr(depuisIso(m['echeance'] as String))}',
+                      style: const TextStyle(color: Couleurs.encre)),
+                ),
+                TextButton(
+                    onPressed: () => nouvelleDepenseNature(context,
+                        entite: m['entite'] as String, nature: m['nature'] as String, beneficiaire: m['beneficiaire'] as String, montant: m['montant'] as int),
+                    child: const Text('Payer')),
+              ]),
+          ]),
+        ),
+      ],
+    ]);
   }
 }

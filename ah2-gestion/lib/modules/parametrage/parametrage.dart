@@ -196,6 +196,23 @@ class Parametrage {
   static void _versionSuivante(Base base) =>
       base.definirParam('version_parametrage', '${base.paramInt('version_parametrage', 0) + 1}');
 
+  /// Change le mot de passe (et, si donné, le code court) d'un utilisateur.
+  static void changerMotDePasse(Session s, String identifiant, String motDePasse, {String? code}) =>
+      modifier(s, 'utilisateurs', 'mot_de_passe:$identifiant', () {
+        if (motDePasse.length < 6) throw const RegleMetier('Le mot de passe doit contenir au moins 6 caractères.');
+        if (code != null && code.length < 4) throw const RegleMetier('Le code doit contenir au moins 4 chiffres.');
+        final sel = Securite.nouveauSel();
+        s.base.exec('UPDATE utilisateurs SET sel=?, empreinte=? WHERE identifiant=?', [sel, Securite.hacher(motDePasse, sel), identifiant]);
+        if (code != null) {
+          final selCode = Securite.nouveauSel();
+          s.base.exec('UPDATE utilisateurs SET sel_code=?, empreinte_code=? WHERE identifiant=?', [selCode, Securite.hacher(code, selCode), identifiant]);
+        }
+      }, nouveau: 'modifié');
+
+  /// Ouverture directe (0) ou demande d'identifiant et de mot de passe (1).
+  static void exigerConnexion(Session s, bool exiger) => modifier(s, 'parametrage', 'parametre:connexion_requise',
+      () => s.base.definirParam('connexion_requise', exiger ? '1' : '0'), ancien: s.base.param('connexion_requise', '0'), nouveau: exiger ? '1' : '0');
+
   static String _insererUtilisateur(
       Base base, String identifiant, String nom, String role, String mdp, String? activite, String? code) {
     if (mdp.length < 6) throw const RegleMetier('Le mot de passe doit contenir au moins 6 caractères.');

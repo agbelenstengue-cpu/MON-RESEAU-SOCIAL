@@ -468,13 +468,40 @@ class EcranParametrage extends StatelessWidget {
       'sync_alerte_heures': 'Alerte appareil non synchronisé (heures)',
       'connexion_echecs_max': 'Échecs de connexion avant verrouillage',
       'connexion_verrou_minutes': 'Durée du verrouillage (minutes)',
-      'inactivite_minutes': 'Déconnexion après inactivité (minutes)',
+      'inactivite_minutes': 'Déconnexion après inactivité (minutes, si la connexion est demandée)',
+      'remede_litres_par_patient': 'Quantité de remède servie par patient et par jour (litres)',
       'releve_section_ecarts': 'Section « Écarts constatés » sur les relevés (1 = oui, 0 = non)',
       'seuil_don_liste': 'Liste des dons supérieurs à (FCFA)',
       'sauvegarde_conservation_jours': 'Conservation des sauvegardes (jours)',
       'coupures': 'Billets et pièces pour le billetage (séparés par des virgules)',
     };
+    final etat = Etat.de(context);
     return _liste([
+      Card(
+        child: SwitchListTile(
+          value: etat.connexionRequise,
+          title: const Text('Demander un identifiant et un mot de passe à l’ouverture'),
+          subtitle: Text(etat.connexionRequise
+              ? 'Chaque personne se connecte avec son identifiant.'
+              : 'Le logiciel s’ouvre directement sur le compte « ${etat.session!.nom} ».'),
+          onChanged: !ok
+              ? null
+              : (v) {
+                  if (!v) {
+                    reussir(context, () => Parametrage.exigerConnexion(_s(context), false), succes: 'Ouverture directe rétablie.');
+                    return;
+                  }
+                  formulaire(context, 'Mot de passe du comptable', const [
+                    Champ('mdp', 'Nouveau mot de passe (6 caractères minimum)'),
+                    Champ('code', 'Code court pour le téléphone (4 chiffres, facultatif)', nombre: true),
+                  ], (c, x) => reussir(c, () {
+                    Parametrage.changerMotDePasse(_s(c), 'comptable', x['mdp']!, code: x['code']!.isEmpty ? null : x['code']);
+                    Parametrage.exigerConnexion(_s(c), true);
+                  }, succes: 'Connexion activée. Identifiant : comptable.'));
+                },
+        ),
+      ),
+      const SizedBox(height: 8),
       Card(
         child: Column(children: [
           for (final e in libelles.entries)

@@ -11,6 +11,7 @@ import '../../modules/tresorerie/tresorerie.dart';
 import '../../noyau/outils.dart';
 import '../../pdf/documents.dart';
 import '../../rapports/etats_stocks_hospitalisation.dart';
+import '../../rapports/etats_suivi_audit.dart';
 import '../etat_app.dart';
 import '../theme.dart';
 import '../widgets/commun.dart';
@@ -129,6 +130,11 @@ class FicheSejour extends StatelessWidget {
                 onPressed: () => ouvrirSortieStock(context, stock: 'PHM', type: 'delivrance_sejour', sejour: id),
                 icon: const Icon(Icons.medication_outlined),
                 label: const Text('Délivrer un médicament')),
+          FilledButton.tonalIcon(
+            onPressed: () => afficherPdf(context, () => Documents.rapport(b, EtatsSuivi.sejour(b, id)), 'Fiche de suivi ${se['numero']}'),
+            icon: const Icon(Icons.list_alt_outlined),
+            label: const Text('Fiche de suivi'),
+          ),
           OutlinedButton.icon(
             onPressed: () => afficherPdf(context, () => Documents.rapport(b, EtatsHospitalisation.facture(b, id)), 'Facture ${se['numero']}'),
             icon: const Icon(Icons.picture_as_pdf_outlined),

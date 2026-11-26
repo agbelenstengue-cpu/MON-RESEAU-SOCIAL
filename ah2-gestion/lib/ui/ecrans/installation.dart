@@ -1,6 +1,8 @@
 /// Première installation : PC central, ou appareil qui rejoint la structure.
 library;
 
+import 'dart:math';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../demo/demonstration.dart';
@@ -21,8 +23,6 @@ class EcranInstallation extends StatefulWidget {
 class _EcranInstallationState extends State<EcranInstallation> {
   String? _mode; // central ou appareil
   final _code = TextEditingController();
-  final _mdp = TextEditingController();
-  final _mdp2 = TextEditingController();
   final _adresse = TextEditingController();
   final _cle = TextEditingController();
   bool _demo = false;
@@ -34,10 +34,6 @@ class _EcranInstallationState extends State<EcranInstallation> {
     final code = _code.text.trim().toUpperCase();
     setState(() => _erreur = null);
     if (!RegExp(r'^[A-Z][A-Z0-9]{1,5}$').hasMatch(code)) return setState(() => _erreur = 'Code appareil invalide (ex. PC1).');
-    if (!_demo) {
-      if (_mdp.text.length < 6) return setState(() => _erreur = 'Mot de passe : 6 caractères minimum.');
-      if (_mdp.text != _mdp2.text) return setState(() => _erreur = 'Les deux mots de passe sont différents.');
-    }
     setState(() => _enCours = true);
     try {
       await enregistrerCodeAppareil(code);
@@ -47,7 +43,12 @@ class _EcranInstallationState extends State<EcranInstallation> {
         Demo.installerCentral(etat.base!, logo: logo);
         Demo.donneesFictives(etat.base!);
       } else {
-        Parametrage.installerPcCentral(etat.base!, motDePasseAdmin: _mdp.text, logo: logo);
+        // Ouverture directe : pas de mot de passe à retenir. Le mot de passe
+        // administrateur est tiré au hasard ; le comptable pourra en définir
+        // un dans Paramétrage s'il active la connexion.
+        final r = Random.secure();
+        final mdp = List.generate(24, (_) => 'abcdefghjkmnpqrstuvwxyz23456789'[r.nextInt(31)]).join();
+        Parametrage.installerPcCentral(etat.base!, motDePasseAdmin: mdp, logo: logo);
       }
       await etat.demarrerServices();
       etat.rafraichir();
@@ -121,16 +122,11 @@ class _EcranInstallationState extends State<EcranInstallation> {
                   value: _demo,
                   onChanged: (v) => setState(() => _demo = v),
                   title: const Text('Charger les données de démonstration (fictives)'),
-                  subtitle: const Text('Tous les comptes de démonstration ont le mot de passe demo1234.'),
+                  subtitle: const Text('Pour essayer : on la quitte ensuite depuis le menu du compte (en haut à droite).'),
                 ),
-                if (!_demo) ...[
-                  const SizedBox(height: 12),
-                  TextField(controller: _mdp, obscureText: true, decoration: const InputDecoration(labelText: 'Mot de passe administrateur')),
-                  const SizedBox(height: 12),
-                  TextField(controller: _mdp2, obscureText: true, decoration: const InputDecoration(labelText: 'Confirmer le mot de passe')),
-                  const SizedBox(height: 4),
-                  const Text("Identifiant de l'administrateur : admin", style: TextStyle(fontSize: 12)),
-                ],
+                const SizedBox(height: 4),
+                const Text('Le logiciel s’ouvre directement sur le compte du comptable, avec tous les menus. Aucun identifiant ni mot de passe '
+                    'n’est demandé ; vous pourrez en exiger un plus tard dans Paramétrage.', style: TextStyle(fontSize: 13)),
               ],
               if (_mode == 'appareil') ...[
                 const SizedBox(height: 12),

@@ -3,6 +3,7 @@
 library;
 
 import 'package:material_ui/material_ui.dart';
+import 'package:printing/printing.dart';
 
 import '../../noyau/outils.dart';
 import '../../pdf/documents.dart';
@@ -16,7 +17,8 @@ import '../widgets/pdf_ui.dart';
 import 'patients.dart';
 
 class EcranRapports extends StatefulWidget {
-  const EcranRapports({super.key});
+  final String initial;
+  const EcranRapports({super.key, this.initial = 'financier'});
   @override
   State<EcranRapports> createState() => _EcranRapportsState();
 }
@@ -24,7 +26,7 @@ class EcranRapports extends StatefulWidget {
 enum _TypePeriode { jour, semaine, mois, trimestre, annee, libre }
 
 class _EcranRapportsState extends State<EcranRapports> {
-  String _id = 'financier';
+  late String _id = widget.initial;
   _TypePeriode _type = _TypePeriode.mois;
   DateTime? _ref;
   DateTimeRange? _libre;
@@ -99,9 +101,29 @@ class _EcranRapportsState extends State<EcranRapports> {
       const SizedBox(height: 12),
       Wrap(spacing: 8, runSpacing: 8, children: [
         FilledButton.icon(
-          onPressed: rapport == null ? null : () => afficherPdf(context, () => Documents.rapport(b, rapport), rapport.titre),
-          icon: const Icon(Icons.picture_as_pdf_outlined),
-          label: const Text('PDF (imprimer, partager)'),
+          onPressed: rapport == null ? null : () => afficherPdf(context, () => Documents.rapport(b, rapport), rapport.nomFichier),
+          icon: const Icon(Icons.visibility_outlined),
+          label: const Text('Afficher'),
+        ),
+        OutlinedButton.icon(
+          onPressed: rapport == null
+              ? null
+              : () async {
+                  final octets = await Documents.rapport(b, rapport);
+                  if (context.mounted) await enregistrerSous(context, octets, '${rapport.nomFichier}.pdf');
+                },
+          icon: const Icon(Icons.download_outlined),
+          label: const Text('Enregistrer'),
+        ),
+        OutlinedButton.icon(
+          onPressed: rapport == null ? null : () async => partagerFichier(await Documents.rapport(b, rapport), '${rapport.nomFichier}.pdf'),
+          icon: const Icon(Icons.share_outlined),
+          label: const Text('Partager'),
+        ),
+        OutlinedButton.icon(
+          onPressed: rapport == null ? null : () => Printing.layoutPdf(onLayout: (_) => Documents.rapport(b, rapport), name: rapport.nomFichier),
+          icon: const Icon(Icons.print_outlined),
+          label: const Text('Imprimer'),
         ),
         OutlinedButton.icon(
           onPressed: rapport == null
@@ -169,7 +191,27 @@ class _EcranRapportsState extends State<EcranRapports> {
             onChanged: (v) => setState(() => maj(v)),
           ),
         );
+    final anneeCourante = b.maintenant.year;
+    final premiere = int.tryParse(((b.valeur('SELECT MIN(date) FROM ecritures') as String?) ?? '$anneeCourante').substring(0, 4)) ?? anneeCourante;
     return Wrap(spacing: 10, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
+      if (f.contains(Filtre.periode) || f.contains(Filtre.date))
+        SizedBox(
+          width: 150,
+          child: DropdownButtonFormField<int>(
+            initialValue: ref.year,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Exercice', isDense: true),
+            items: [
+              for (var a = anneeCourante + 1; a >= (premiere < anneeCourante - 5 ? premiere : anneeCourante - 5); a--)
+                DropdownMenuItem(value: a, child: Text('$a'))
+            ],
+            onChanged: (a) => setState(() {
+              if (a == null) return;
+              _ref = a == anneeCourante ? b.maintenant : DateTime(a, 12, 31);
+              if (f.contains(Filtre.periode) && _type != _TypePeriode.libre && a != anneeCourante) _type = _TypePeriode.annee;
+            }),
+          ),
+        ),
       if (f.contains(Filtre.periode))
         ChoixPastilles<_TypePeriode>(
           options: const [

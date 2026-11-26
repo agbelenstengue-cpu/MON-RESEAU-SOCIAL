@@ -398,6 +398,10 @@ Future<void> ouvrirEntreeStock(BuildContext context, {required String stock}) {
     const Champ('peremption', 'Date de péremption (JJ/MM/AAAA)'),
     const Champ('cout', "Coût unitaire d'achat ou valeur estimée (FCFA)", nombre: true),
     const Champ('facture', 'N° de facture fournisseur'),
+    Champ('paiement', 'Paiement (achat)', choix: [
+      ('', 'À crédit : dette envers le fournisseur'),
+      for (final m in [Modes.especes, Modes.orange, Modes.mtn, Modes.virement]) (m, 'Payé comptant : ${Modes.libelles[m]}'),
+    ]),
   ], (c, v) => reussir(
       c,
       () => Stocks.entrer(Etat.lire(c).session!,
@@ -407,6 +411,7 @@ Future<void> ouvrirEntreeStock(BuildContext context, {required String stock}) {
           donateur: v['donateur']!.isEmpty ? null : v['donateur'],
           commande: v['commande']!.isEmpty ? null : v['commande'],
           facture: v['facture'],
+          payeComptant: v['paiement']!.isEmpty ? null : v['paiement'],
           lignes: [
             LigneStock(v['produit']!, int.tryParse(v['quantite']!) ?? 0,
                 lot: v['lot'], peremption: v['peremption']!.isEmpty ? null : _iso(v['peremption']!), coutUnitaire: int.tryParse(v['cout']!) ?? 0)

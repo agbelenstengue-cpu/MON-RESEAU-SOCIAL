@@ -7,13 +7,17 @@ import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
 
 import '../../modules/desintox/desintox.dart';
+import '../../modules/parametrage/parametrage.dart';
+import '../../modules/stocks/stocks.dart';
 import '../../modules/patients/patients.dart';
 import '../../modules/tresorerie/tresorerie.dart';
 import '../../noyau/outils.dart';
 import '../../pdf/documents.dart';
+import '../../rapports/etats_suivi_audit.dart';
 import '../etat_app.dart';
 import '../theme.dart';
 import '../widgets/commun.dart';
+import '../widgets/formulaire.dart';
 import '../widgets/pdf_ui.dart';
 import 'patients.dart';
 import 'stocks_ecran.dart';
@@ -57,6 +61,17 @@ class _EcranDesintoxState extends State<EcranDesintox> {
               MediaQuery.sizeOf(context).width < 600
                   ? IconButton.filled(tooltip: 'Inscrire', onPressed: () => _inscrire(context), icon: const Icon(Icons.add))
                   : FilledButton.icon(onPressed: () => _inscrire(context), icon: const Icon(Icons.add), label: const Text('Inscrire')),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: Wrap(spacing: 8, runSpacing: 8, children: [
+            if (s.peut('stocks', 'creer') && Stocks.remedes(b).isNotEmpty)
+              OutlinedButton.icon(
+                  onPressed: () => servirRemedes(context), icon: const Icon(Icons.local_drink_outlined), label: const Text('Servir les remèdes du jour')),
+            if (s.peut('parametrage', 'creer') && etat.estCentral)
+              OutlinedButton.icon(
+                  onPressed: () => programmesEtTarifs(context), icon: const Icon(Icons.price_change_outlined), label: const Text('Programmes et prix du litre')),
           ]),
         ),
         const TabBar(isScrollable: true, tabs: [Tab(text: 'En cours'), Tab(text: 'Sortis avec solde dû'), Tab(text: 'Archives')]),
@@ -275,8 +290,20 @@ class FicheDesintox extends StatelessWidget {
           ]),
         ),
         const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.assignment_outlined, color: Couleurs.primaire),
+            title: Text('Abonnement : ${fcfa(d['montant_total'] as int)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text('${prog['libelle']}${((d['medicaments_factures'] as int?) ?? 0) > 0 ? ' · médicaments facturés en plus : ${fcfa(d['medicaments_factures'] as int)}' : ''}'
+                ' · produits et remèdes compris : ${fcfa((d['medicaments_compris'] as int?) ?? 0)}'),
+            trailing: s.peut('desintox', 'valider')
+                ? TextButton.icon(onPressed: () => _montant(context, sit), icon: const Icon(Icons.edit_outlined), label: const Text('Modifier'))
+                : null,
+          ),
+        ),
+        const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: CarteIndicateur(libelle: 'Montant total', valeur: fcfa(sit.total))),
+          Expanded(child: CarteIndicateur(libelle: 'Total dû', valeur: fcfa(sit.total))),
           const SizedBox(width: 8),
           Expanded(child: CarteIndicateur(libelle: 'Total versé', valeur: fcfa(sit.verse), couleurDetail: Couleurs.hausse)),
           const SizedBox(width: 8),
@@ -316,6 +343,14 @@ class FicheDesintox extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Wrap(spacing: 12, runSpacing: 12, children: [
+          FilledButton.tonalIcon(
+            onPressed: () => afficherPdf(context, () => Documents.rapport(b, EtatsSuivi.desintox(b, id)), 'Fiche de suivi ${d['numero']}'),
+            icon: const Icon(Icons.list_alt_outlined),
+            label: const Text('Fiche de suivi (tout ce qui a été donné)'),
+          ),
+          if (enCours && s.peut('stocks', 'creer') && Stocks.remedes(b).isNotEmpty)
+            OutlinedButton.icon(
+                onPressed: () => servirRemedes(context, dossiers: [id]), icon: const Icon(Icons.local_drink_outlined), label: const Text('Servir un remède')),
           OutlinedButton.icon(
             onPressed: () => afficherPdf(context, () => Documents.rapportSortie(b, id), 'Rapport de sortie ${d['numero']}'),
             icon: const Icon(Icons.picture_as_pdf_outlined),
@@ -328,8 +363,6 @@ class FicheDesintox extends StatelessWidget {
                 label: const Text('Délivrer des médicaments')),
           if (enCours && s.peut('desintox', 'creer'))
             OutlinedButton.icon(onPressed: () => _sortie(context), icon: const Icon(Icons.logout), label: const Text('Enregistrer la sortie')),
-          if (s.peut('desintox', 'valider'))
-            OutlinedButton.icon(onPressed: () => _montant(context, sit), icon: const Icon(Icons.edit_outlined), label: const Text('Modifier le montant')),
         ]),
       ]),
     );
@@ -431,18 +464,18 @@ class FicheDesintox extends StatelessWidget {
   }
 
   void _montant(BuildContext context, SituationDesintox sit) {
-    final m = TextEditingController(text: '${sit.total}');
+    final m = TextEditingController(text: '${sit.dossier['montant_total']}');
     final motif = TextEditingController();
     showDialog<void>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Modifier le montant total'),
+        title: const Text("Modifier l'abonnement de ce patient"),
         content: SizedBox(
           width: 400,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            ChampMontant(controleur: m, aide: 'Déjà versé : ${fcfa(sit.verse)}'),
+            ChampMontant(controleur: m, libelle: 'Abonnement (FCFA)', aide: 'Déjà versé : ${fcfa(sit.verse)} · le programme ne change pas pour les autres patients'),
             const SizedBox(height: 12),
-            TextField(controller: motif, decoration: const InputDecoration(labelText: 'Motif (obligatoire, tracé)')),
+            TextField(controller: motif, decoration: const InputDecoration(labelText: 'Motif (obligatoire, tracé)', hintText: 'ex. réduction accordée par la direction')),
           ]),
         ),
         actions: [
@@ -450,7 +483,7 @@ class FicheDesintox extends StatelessWidget {
           FilledButton(
             onPressed: () {
               if (executer(c, () => Desintox.modifierMontant(Etat.lire(c).session!, id, lireMontant(m), motif.text),
-                      succes: 'Montant modifié.') !=
+                      succes: 'Abonnement modifié.') !=
                   null) {
                 Navigator.pop(c);
               }
@@ -462,3 +495,168 @@ class FicheDesintox extends StatelessWidget {
     );
   }
 }
+
+
+/// Servir un remède (AE, SE…) en un geste : tous les patients présents sont
+/// cochés avec la quantité habituelle (1 litre par défaut), modifiable.
+Future<void> servirRemedes(BuildContext context, {List<String>? dossiers}) {
+  final etat = Etat.lire(context);
+  final b = etat.base!;
+  final remedes = Stocks.remedes(b);
+  final presents = Desintox.listeTravail(b, onglet: 'en_cours')
+      .where((x) => dossiers == null || dossiers.contains(x.dossier['id']))
+      .toList();
+  if (presents.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Aucun patient en cours.')));
+    return Future.value();
+  }
+  String produit = remedes.first['code'] as String;
+  final defaut = b.paramInt('remede_litres_par_patient', 1);
+  final quantites = {for (final x in presents) x.dossier['id'] as String: defaut};
+  return showDialog<void>(
+    context: context,
+    builder: (c) => StatefulBuilder(builder: (c, maj) {
+      final total = quantites.values.fold<int>(0, (t, q) => t + q);
+      final p = remedes.firstWhere((r) => r['code'] == produit);
+      final dispo = Stocks.quantite(b, produit);
+      return AlertDialog(
+        title: const Text('Servir un remède'),
+        content: SizedBox(
+          width: 480,
+          height: 460,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            ChoixPastilles<String>(
+              options: [for (final r in remedes) (r['code'] as String, r['designation'] as String)],
+              valeur: produit,
+              onChanged: (v) => maj(() => produit = v),
+            ),
+            const SizedBox(height: 8),
+            Text('En stock : $dispo ${p['unite']} · prix du litre ${fcfa(p['prix_vente'] as int)} · compris dans l\'abonnement',
+                style: const TextStyle(fontSize: 13)),
+            const Divider(),
+            Expanded(
+              child: ListView(children: [
+                for (final x in presents)
+                  () {
+                    final id = x.dossier['id'] as String;
+                    final pa = Patients.lire(b, x.dossier['patient'] as String);
+                    return ListTile(
+                      dense: true,
+                      title: Text('${pa['nom']} ${pa['prenoms']}'),
+                      subtitle: Text('Dossier ${x.dossier['numero']}'),
+                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                        IconButton(icon: const Icon(Icons.remove), onPressed: quantites[id]! > 0 ? () => maj(() => quantites[id] = quantites[id]! - 1) : null),
+                        SizedBox(width: 44, child: Text('${quantites[id]} L', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700))),
+                        IconButton(icon: const Icon(Icons.add), onPressed: () => maj(() => quantites[id] = quantites[id]! + 1)),
+                      ]),
+                    );
+                  }(),
+              ]),
+            ),
+            const Divider(),
+            Text('Total servi : $total ${p['unite']}', style: const TextStyle(fontWeight: FontWeight.w700)),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Annuler')),
+          FilledButton(
+            onPressed: total == 0
+                ? null
+                : () {
+                    if (executer(c, () => Stocks.servirRemede(Etat.lire(c).session!, produit: produit, parDossier: Map.of(quantites)),
+                            succes: '$total ${p['unite']} de ${p['designation']} servis.') !=
+                        null) {
+                      Navigator.pop(c);
+                    }
+                  },
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      );
+    }),
+  );
+}
+
+/// Programmes de désintoxication (abonnements) et prix du litre des remèdes.
+Future<void> programmesEtTarifs(BuildContext context) => showDialog<void>(
+      context: context,
+      builder: (c) => StatefulBuilder(builder: (c, maj) {
+        final etat = Etat.lire(c);
+        final b = etat.base!;
+        final s = etat.session!;
+        final programmes = b.lignes('SELECT * FROM programmes_desintox WHERE actif=1 ORDER BY code');
+        void editer([Map<String, Object?>? p]) => formulaire(c, p == null ? 'Nouveau programme' : 'Programme ${p['libelle']}', [
+              Champ('libelle', 'Libellé', initial: (p?['libelle'] as String?) ?? ''),
+              Champ('type', 'Type', choix: const [('residentiel', 'Résidentiel (interné)'), ('ambulatoire', 'Ambulatoire')], initial: (p?['type'] as String?) ?? ''),
+              Champ('duree', 'Durée (jours)', nombre: true, initial: '${p?['duree_jours'] ?? 30}'),
+              Champ('mode', 'Calcul', choix: const [('forfait', 'Forfait pour tout le programme'), ('journalier', 'Prix par jour')], initial: (p?['mode_calcul'] as String?) ?? ''),
+              Champ('montant', 'Montant de l\'abonnement (FCFA)', nombre: true, initial: '${p?['montant'] ?? ''}',
+                  aide: 'Pour les nouvelles inscriptions ; les patients déjà inscrits gardent leur montant.'),
+            ], (d, v) {
+              final ok = reussir(
+                  d,
+                  () => Parametrage.enregistrerProgramme(s,
+                      code: (p?['code'] as String?) ?? 'P${(b.entier('SELECT COUNT(*) FROM programmes_desintox') + 1).toString().padLeft(2, '0')}-${v['duree']}',
+                      libelle: v['libelle']!,
+                      type: v['type']!,
+                      duree: int.tryParse(v['duree']!) ?? 0,
+                      modeCalcul: v['mode']!,
+                      montant: int.tryParse(v['montant']!) ?? 0),
+                  succes: 'Programme enregistré.');
+              if (ok) maj(() {});
+              return ok;
+            });
+        return AlertDialog(
+          title: const Text('Programmes et prix du litre'),
+          content: SizedBox(
+            width: 540,
+            height: 460,
+            child: ListView(children: [
+              const TitreSection('Programmes (abonnements)'),
+              for (final p in programmes)
+                ListTile(
+                  dense: true,
+                  title: Text(p['libelle'] as String),
+                  subtitle: Text('${p['duree_jours']} jours · ${p['mode_calcul'] == 'forfait' ? 'forfait' : 'par jour'}'),
+                  trailing: Text(fcfa(p['montant'] as int), style: const TextStyle(fontWeight: FontWeight.w700)),
+                  onTap: () => editer(p),
+                ),
+              TextButton.icon(onPressed: () => editer(), icon: const Icon(Icons.add), label: const Text('Ajouter un programme')),
+              const Divider(),
+              const TitreSection('Remèdes traditionnels : prix du litre', sousTitre: 'Réservé au comptable ; les quantités déjà servies ne changent pas.'),
+              for (final r in Stocks.remedes(b))
+                ListTile(
+                  dense: true,
+                  title: Text(r['designation'] as String),
+                  subtitle: Text('Stock : ${Stocks.quantite(b, r['code'] as String)} ${r['unite']}'),
+                  trailing: Text('${fcfa(r['prix_vente'] as int)} / L', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  onTap: () => formulaire(c, 'Prix du litre : ${r['designation']}', [
+                    Champ('prix', 'Prix du litre (FCFA)', nombre: true, initial: '${r['prix_vente']}'),
+                  ], (d, v) {
+                    final ok = reussir(d, () => Stocks.prixLitre(s, r['code'] as String, int.tryParse(v['prix']!) ?? 0), succes: 'Prix du litre modifié.');
+                    if (ok) maj(() {});
+                    return ok;
+                  }),
+                ),
+              TextButton.icon(
+                onPressed: () => formulaire(c, 'Nouveau remède', const [
+                  Champ('code', 'Code court (ex. AE, SE, TISANE)'),
+                  Champ('designation', 'Nom du remède'),
+                  Champ('prix', 'Prix du litre (FCFA)', nombre: true),
+                ], (d, v) {
+                  final ok = reussir(d, () {
+                    Stocks.enregistrerProduit(s, code: v['code']!, designation: v['designation']!, stock: 'PHT', unite: 'litre', prixVente: int.tryParse(v['prix']!) ?? 0);
+                    s.base.transaction(() => s.base.exec('UPDATE produits SET remede=1 WHERE code=?', [v['code']!.trim().toUpperCase()]));
+                  }, succes: 'Remède ajouté.');
+                  if (ok) maj(() {});
+                  return ok;
+                }),
+                icon: const Icon(Icons.add),
+                label: const Text('Ajouter un remède'),
+              ),
+            ]),
+          ),
+          actions: [FilledButton(onPressed: () => Navigator.pop(c), child: const Text('Fermer'))],
+        );
+      }),
+    );

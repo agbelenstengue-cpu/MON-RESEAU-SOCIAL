@@ -51,7 +51,8 @@ void main() {
       for (final d in destinations) {
         if (!d.visible(etat)) continue;
         if (nom == 'pc') {
-          await t.tap(find.text(d.libelle).last);
+          await t.scrollUntilVisible(find.text(d.libelle).first, 80, scrollable: find.byType(Scrollable).first);
+          await t.tap(find.text(d.libelle).first);
         } else {
           final court = d.court;
           final bas = find.descendant(of: find.byType(NavigationBar), matching: find.text(court));

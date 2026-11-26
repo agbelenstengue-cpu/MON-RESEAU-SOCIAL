@@ -1,5 +1,5 @@
-/// Impression et partage des documents PDF (imprimante Wi-Fi ou Bluetooth,
-/// WhatsApp, e-mail…).
+/// Affichage des documents PDF dans l'application, puis : Enregistrer,
+/// Partager (WhatsApp, e-mail…), Imprimer (imprimante Wi-Fi ou Bluetooth).
 library;
 
 import 'dart:typed_data';
@@ -9,35 +9,48 @@ import 'package:printing/printing.dart';
 
 import '../../pdf/documents.dart';
 import '../etat_app.dart';
+import 'enregistrer_fichier.dart';
 
 Future<void> afficherPdf(BuildContext context, Future<Uint8List> Function() fabriquer, String nom) async {
   final octets = await fabriquer();
   if (!context.mounted) return;
-  await showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (c) => SafeArea(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        ListTile(title: Text(nom, style: const TextStyle(fontWeight: FontWeight.w700))),
-        ListTile(
-          leading: const Icon(Icons.print_outlined),
-          title: const Text('Imprimer'),
-          onTap: () async {
-            Navigator.pop(c);
-            await Printing.layoutPdf(onLayout: (_) async => octets, name: nom);
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.share_outlined),
-          title: const Text('Partager (WhatsApp, e-mail…) ou enregistrer'),
-          onTap: () async {
-            Navigator.pop(c);
-            await Printing.sharePdf(bytes: octets, filename: '$nom.pdf');
-          },
-        ),
-      ]),
-    ),
-  );
+  await garderCopie(octets, '$nom.pdf');
+  if (!context.mounted) return;
+  await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => VisionneusePdf(octets: octets, nom: nom)));
+}
+
+/// Visionneuse plein écran.
+class VisionneusePdf extends StatelessWidget {
+  final Uint8List octets;
+  final String nom;
+  const VisionneusePdf({super.key, required this.octets, required this.nom});
+
+  @override
+  Widget build(BuildContext context) {
+    final etroit = MediaQuery.sizeOf(context).width < 600;
+    Widget bouton(IconData i, String t, VoidCallback f) => etroit
+        ? IconButton(tooltip: t, icon: Icon(i), onPressed: f)
+        : TextButton.icon(onPressed: f, icon: Icon(i), label: Text(t));
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(nom, overflow: TextOverflow.ellipsis),
+        actions: [
+          bouton(Icons.download_outlined, 'Enregistrer', () => enregistrerSous(context, octets, '$nom.pdf')),
+          bouton(Icons.share_outlined, 'Partager', () => partagerFichier(octets, '$nom.pdf')),
+          bouton(Icons.print_outlined, 'Imprimer', () => Printing.layoutPdf(onLayout: (_) async => octets, name: nom)),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: PdfPreview(
+        build: (_) async => octets,
+        useActions: false,
+        canChangeOrientation: false,
+        canChangePageFormat: false,
+        canDebug: false,
+        pdfFileName: '$nom.pdf',
+      ),
+    );
+  }
 }
 
 Future<void> afficherRecu(BuildContext context, String uuidOp) {
